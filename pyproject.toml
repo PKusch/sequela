@@ -1,0 +1,18 @@
+[project]
+name = "sequela"
+version = "0.1.0"
+description = "Does an agent know what its own tool call will do, and does it act on that knowledge? A metacognition benchmark with a verifiable oracle."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+dependencies = []
+
+[project.scripts]
+sequela = "sequela.run:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["sequela", "sequela.respondents"]

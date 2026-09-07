@@ -1,0 +1,36 @@
+name: checks
+
+# The README states a task count and a set of calibration numbers. This runs
+# the tests, regenerates the dataset and fails if the committed copy has
+# drifted, then re-runs every reference respondent so the numbers in the
+# README are checked rather than asserted.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.12", "3.13"]
+    name: python ${{ matrix.python }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Tests
+        run: python -m unittest discover -s tests -v
+      - name: Dataset is current
+        run: python -m sequela.run check
+      - name: Reference respondents
+        run: |
+          for p in oracle uncoupled trusting name_reader schema_blind paranoid; do
+            python -m sequela.run run reference:$p --out /tmp/$p.json >/dev/null
+          done
+          python -m sequela.run report /tmp/*.json
