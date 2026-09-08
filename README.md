@@ -206,8 +206,10 @@ A reading becomes part of this README only when the file is downloaded into
 
 Until that is done this repository is an instrument with a calibration
 certificate and no readings. The Kaggle Benchmarks adapter in
-[`kaggle/sequela_task.py`](kaggle/sequela_task.py) is likewise written against
-the SDK's public README and has not been executed in a Kaggle runtime.
+[`kaggle/sequela_task.py`](kaggle/sequela_task.py) has been executed against
+the real SDK (0.6.1) with stub models built from the reference policies, in its
+own CI job; each flaw trips the assertion written for it. It has not been run
+in a Kaggle runtime against a hosted model.
 
 ## What this adds to the winning entries
 
@@ -268,7 +270,7 @@ sequela/
 data/tasks.jsonl   251 tasks
 results/reference/ the six calibration runs
 tests/             51 tests
-kaggle/            Kaggle Benchmarks adapter (unvalidated)
+kaggle/            Kaggle Benchmarks adapter (executed against the SDK with stubs; not in a Kaggle runtime)
 WRITEUP.md         the submission write-up in the hackathon's template
 ```
 

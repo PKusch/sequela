@@ -1,8 +1,10 @@
 """
-Kaggle Benchmarks adapter. UNVALIDATED: written against the public README of
-the kaggle-benchmarks SDK (the @kbench.task decorator, llm.prompt, and the
-assertions module) without a Kaggle runtime to execute it in. The scoring
-logic it calls is the same tested code the CLI uses; only the glue is unrun.
+Kaggle Benchmarks adapter. Executed against kaggle-benchmarks 0.6.1 with stub
+models built from the reference policies (tests/test_kaggle_adapter.py, run in
+its own CI job): the decorator, Task.run and the assertions behave as assumed,
+and each reference flaw trips the assertion written for it. Not yet executed
+in a Kaggle runtime against a hosted model. The scoring it calls is the same
+tested code the CLI uses.
 
 Usage inside a Kaggle notebook:
 
