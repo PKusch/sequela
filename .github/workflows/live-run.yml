@@ -1,0 +1,81 @@
+name: live run
+
+# Runs one respondent against all 251 tasks from a repository secret, so a
+# live reading can be taken without a key on any laptop. Manual only. The
+# result file is uploaded as an artifact and the table is written to the job
+# summary; nothing is committed. To publish a reading, download the artifact
+# into results/live/ and commit it with the README table updated.
+#
+# Secrets: ANTHROPIC_API_KEY for anthropic:*, OPENAI_API_KEY for openai:*.
+# Optional: OPENAI_BASE_URL for any OpenAI-compatible endpoint.
+
+on:
+  workflow_dispatch:
+    inputs:
+      respondent:
+        description: "anthropic:<model> | openai:<model>"
+        required: true
+        default: "anthropic:claude-sonnet-5"
+      limit:
+        description: "Only the first N tasks (blank = all 251)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      OPENAI_BASE_URL: ${{ secrets.OPENAI_BASE_URL }}
+      RESPONDENT: ${{ inputs.respondent }}
+      LIMIT: ${{ inputs.limit }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+
+      - name: The key for this respondent is present
+        run: |
+          case "$RESPONDENT" in
+            anthropic:*) [ -n "$ANTHROPIC_API_KEY" ] || { echo "::error::ANTHROPIC_API_KEY is not set as a repository secret (Settings → Secrets and variables → Actions)."; exit 1; } ;;
+            openai:*)    [ -n "$OPENAI_API_KEY" ]    || { echo "::error::OPENAI_API_KEY is not set as a repository secret."; exit 1; } ;;
+            *) echo "::error::respondent must start with anthropic: or openai:"; exit 1 ;;
+          esac
+
+      - name: Dataset is current
+        run: python -m sequela.run check
+
+      - name: Run
+        run: |
+          name="$(echo "$RESPONDENT" | tr ':/' '__')"
+          limit=""
+          [ -n "$LIMIT" ] && limit="--limit $LIMIT"
+          python -m sequela.run run "$RESPONDENT" --out "results/live/${name}.json" $limit
+          echo "RESULT=results/live/${name}.json" >> "$GITHUB_ENV"
+
+      - name: Score, with the reference policies for scale
+        run: |
+          for p in oracle uncoupled trusting name_reader schema_blind paranoid; do
+            python -m sequela.run run reference:$p --out /tmp/ref_$p.json >/dev/null
+          done
+          {
+            echo "## $RESPONDENT"
+            echo
+            python -m sequela.run report "$RESULT" /tmp/ref_*.json
+            echo
+            echo '```'
+            python -m sequela.run score "$RESULT"
+            echo '```'
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sequela-${{ github.run_id }}
+          path: results/live/*.json
+          retention-days: 90

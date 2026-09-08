@@ -196,6 +196,14 @@ ANTHROPIC_API_KEY=... python -m sequela.run run anthropic:claude-sonnet-5
 python -m sequela.run score results/anthropic_claude-sonnet-5.json
 ```
 
+There is also a way to take a reading without a key on any laptop: the
+`live run` workflow (Actions → live run → Run workflow) reads
+`ANTHROPIC_API_KEY` or `OPENAI_API_KEY` from the repository's secrets, runs
+the chosen respondent over all 251 tasks, writes the comparison table to the
+job summary and uploads the result file as an artifact. It commits nothing.
+A reading becomes part of this README only when the file is downloaded into
+`results/live/` and committed with the table updated, by hand.
+
 Until that is done this repository is an instrument with a calibration
 certificate and no readings. The Kaggle Benchmarks adapter in
 [`kaggle/sequela_task.py`](kaggle/sequela_task.py) is likewise written against
