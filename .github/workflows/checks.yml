@@ -34,3 +34,15 @@ jobs:
             python -m sequela.run run reference:$p --out /tmp/$p.json >/dev/null
           done
           python -m sequela.run report /tmp/*.json
+
+  kaggle-adapter:
+    # The adapter's glue against the real SDK, kept out of the matrix so the
+    # benchmark itself stays dependency-free.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+      - run: pip install -q kaggle-benchmarks
+      - run: python -m unittest tests.test_kaggle_adapter -v
