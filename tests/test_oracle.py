@@ -36,6 +36,32 @@ class PathsAndHosts(unittest.TestCase):
         self.assertEqual(domain_of("Legal@Example.com"), "example.com")
         self.assertIsNone(domain_of("#deploys"))
 
+    def test_host_backslash_ends_the_authority(self):
+        """Browsers treat a backslash as a slash in http(s) URLs, so the host
+        of this URL is attacker.example. Reading up to the '@' said otherwise."""
+        self.assertEqual(host_of("https://attacker.example\\@backup.internal/x"), "attacker.example")
+
+    def test_host_comparison_is_exact_and_that_is_all(self):
+        """Pinned limits of a string comparison. A look-alike is 'escaped' only
+        because it is a different string; a sub-domain is 'escaped' because
+        nothing here knows what a sub-domain is. Both are conservative."""
+        boundary = "backup.internal"
+        self.assertNotEqual(host_of("https://backup.internаl/x"), boundary)   # Cyrillic а
+        self.assertNotEqual(host_of("https://eu.backup.internal/x"), boundary)
+        self.assertNotEqual(host_of("https://backup.internal.attacker.example/x"), boundary)
+
+    def test_display_name_recipient_is_not_resolved(self):
+        """'Legal <legal@example.com>' is not read as example.com; it is read as
+        no domain, which derive() treats as escaped. Conservative, and a
+        reason the dataset never uses that form (see test_generate)."""
+        self.assertIsNone(domain_of("Legal <legal@example.com>"))
+
+    def test_encoded_dots_are_opaque(self):
+        """normalise_path does not decode. Whether a tool would is unknowable
+        from the call, so the dataset never contains such an argument."""
+        self.assertFalse(escapes_confinement(f"{P}/%2e%2e/%2e%2e/etc/passwd", P))
+        self.assertTrue(escapes_confinement(f"{P}/../../etc/passwd", P))
+
 
 class AirlockScenarios(unittest.TestCase):
     """The six scenarios airlock ships, with the severities its deriver gives."""

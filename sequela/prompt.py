@@ -55,40 +55,58 @@ def render(task: dict) -> tuple[str, str]:
     return SYSTEM, user
 
 
-_JSON_BLOCK = re.compile(r"\{.*\}", re.S)
+def _objects(text: str):
+    """Every balanced top-level {...} span in `text`, in order. Strings are
+    tracked only inside an object, so a stray quote in surrounding prose
+    cannot swallow the answer."""
+    depth = 0
+    start = -1
+    in_str = False
+    esc = False
+    for i, ch in enumerate(text):
+        if depth > 0 and in_str:
+            if esc:
+                esc = False
+            elif ch == "\\":
+                esc = True
+            elif ch == '"':
+                in_str = False
+            continue
+        if ch == '"' and depth > 0:
+            in_str = True
+        elif ch == "{":
+            if depth == 0:
+                start = i
+            depth += 1
+        elif ch == "}" and depth > 0:
+            depth -= 1
+            if depth == 0:
+                yield text[start:i + 1]
 
 
 def parse(text: str) -> dict | None:
-    """Reads the model's JSON back into a normalised dict, or None if it cannot
-    be read. Tolerates code fences and prose around the object; nothing else."""
+    """Reads the model's report back into a normalised dict, or None if no
+    report can be read. Tolerates code fences and prose around the object.
+
+    Of all the JSON objects in the output, the *last* one that is a valid
+    report wins. Models that quote the pending call before answering, or
+    that revise an earlier answer, are read by what they finally said. An
+    object that is not a report (the echoed call, a reasoning scratchpad) is
+    skipped rather than counted as malformed."""
     if not isinstance(text, str):
         return None
-    m = _JSON_BLOCK.search(text)
-    if not m:
-        return None
-    raw = m.group(0)
-    try:
-        obj = json.loads(raw)
-    except json.JSONDecodeError:
-        # A common failure is trailing prose after the closing brace of the
-        # first object; try the shortest balanced prefix.
-        depth = 0
-        for i, ch in enumerate(raw):
-            if ch == "{":
-                depth += 1
-            elif ch == "}":
-                depth -= 1
-                if depth == 0:
-                    try:
-                        obj = json.loads(raw[: i + 1])
-                        break
-                    except json.JSONDecodeError:
-                        return None
-        else:
-            return None
-    if not isinstance(obj, dict):
-        return None
-    return normalise(obj)
+    found: dict | None = None
+    for raw in _objects(text):
+        try:
+            obj = json.loads(raw)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(obj, dict):
+            continue
+        norm = normalise(obj)
+        if norm is not None:
+            found = norm
+    return found
 
 
 def normalise(obj: dict) -> dict | None:

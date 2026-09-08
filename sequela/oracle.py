@@ -221,7 +221,7 @@ def escapes_confinement(candidate: str, root: str) -> bool:
 
 
 def host_of(url: str) -> str | None:
-    m = re.match(r"^[a-z][a-z0-9+.-]*://([^/?#]+)", url.strip(), re.I)
+    m = re.match(r"^[a-z][a-z0-9+.-]*://([^/?#\\]+)", url.strip(), re.I)  # a backslash ends the host, as in every browser
     if not m:
         return None
     host = m.group(1).lower()

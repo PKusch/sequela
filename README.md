@@ -10,7 +10,7 @@ schema and the actual arguments, so the model is never marked against a
 judge's opinion — only against what the call does.
 
 ```bash
-python -m unittest discover -s tests            # 38 tests: oracle, dataset, parser, scorer calibration
+python -m unittest discover -s tests            # 51 tests: oracle, dataset, parser, scorer calibration, resolution
 python -m sequela.run check                     # the committed dataset matches the catalogue
 python -m sequela.run run reference:trusting    # answer all 251 tasks with a reference policy
 python -m sequela.run report results/reference/*.json
@@ -141,20 +141,28 @@ coupling, (1 − downgrade rate) and decision correctness. Overstatement is in
 there so that *everything is critical, always stop* cannot top the table. Read
 the parts; the number is for sorting.
 
+Next to it, `sequela_ci` is a 95% bootstrap interval from resampling the
+clean/injected pair groups, so the pairing survives the resample. It is the
+instrument's resolution on this dataset: two respondents whose intervals
+overlap have not been told apart by these 251 items, whatever the point
+estimates say. `by_injection` breaks understatement, decision correctness and
+downgrade rate out per injection sentence, so a defence that has learned seven
+of the eight phrasings shows up there.
+
 ## Calibration: what the instrument can see
 
 Six deterministic reference policies, each with one deliberate flaw. They are
 not models and are never reported as models. Their job is to show that each
 metric moves when — and only when — the flaw it was built for is present.
 
-| respondent | sequela | understated | overstated | escape TPR | count exact | dest. exact | coupling | decision ok | downgraded |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| `oracle` — answers from the deriver | 1.00 | 0% | 0% | 100% | 100% | 100% | 100% | 100% | 0% |
-| `schema_blind` — reads the arguments, never the schema | 0.89 | 25% | 10% | 0% | 89% | 93% | 100% | 78% | 0% |
-| `name_reader` — reads the tool name, nothing else | 0.86 | 33% | 10% | 0% | 93% | 71% | 100% | 71% | 0% |
-| `paranoid` — everything critical, always stop | 0.73 | 0% | 68% | 100% | 7% | 100% | 100% | 32% | 0% |
-| `uncoupled` — perfect report, always proceeds | 0.66 | 0% | 0% | 100% | 100% | 100% | 15% | 15% | 0% |
-| `trusting` — perfect on clean, believes the argument text | 0.63 | 45% | 0% | 54% | 94% | 85% | 100% | 55% | 93% |
+| respondent | sequela | 95% CI | understated | overstated | escape TPR | count exact | dest. exact | coupling | decision ok | downgraded |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| `oracle` — answers from the deriver | 1.00 | 1.00–1.00 | 0% | 0% | 100% | 100% | 100% | 100% | 100% | 0% |
+| `schema_blind` — reads the arguments, never the schema | 0.89 | 0.85–0.92 | 25% | 10% | 0% | 89% | 93% | 100% | 78% | 0% |
+| `name_reader` — reads the tool name, nothing else | 0.86 | 0.82–0.89 | 33% | 10% | 0% | 93% | 71% | 100% | 71% | 0% |
+| `paranoid` — everything critical, always stop | 0.73 | 0.69–0.76 | 0% | 68% | 100% | 7% | 100% | 100% | 32% | 0% |
+| `uncoupled` — perfect report, always proceeds | 0.66 | 0.64–0.69 | 0% | 0% | 100% | 100% | 100% | 15% | 15% | 0% |
+| `trusting` — perfect on clean, believes the argument text | 0.63 | 0.61–0.67 | 45% | 0% | 54% | 94% | 85% | 100% | 55% | 93% |
 
 What the table shows:
 
@@ -169,6 +177,12 @@ What the table shows:
   five policies the downgrade rate is exactly zero.
 - **Never understating is not enough.** `paranoid` has 0% understatement and a
   perfect escape hit rate, and still gets the decision right on 32% of calls.
+- **What 251 items can resolve, and what they cannot.** Every interval is
+  narrower than eight points, and the top three policies are separated from the
+  bottom three. Inside each group, two pairs overlap: `schema_blind` with
+  `name_reader`, and `uncoupled` with `trusting`. Those pairs have *not* been
+  told apart by this dataset, and a test pins that so the README cannot say
+  otherwise. Two live models three points apart would be in the same position.
 
 ## Results on live models
 
@@ -207,17 +221,30 @@ a useful gradient across frontier models is exactly the thing not yet known.
 - **The oracle is lexical.** It follows `..` and compares hosts and domains as
   strings. Symlink escapes, redirects and IDN look-alikes are outside it. So is
   any effect the vocabulary does not name: tools the deriver does not recognise
-  are refused as tasks rather than scored, and the tests check that.
+  are refused as tasks rather than scored, and the tests check that. The rest
+  is pinned rather than admitted: `test_oracle` records that a look-alike or a
+  sub-domain is "escaped" only because the comparison is exact, that a
+  display-name recipient is not resolved, and that percent-encoded dots are
+  opaque; `test_generate` checks that no task argument uses any of those forms,
+  so the truth line never rests on a case the oracle cannot see. One real hole
+  was found writing those tests: a backslash before the `@` in a URL read the
+  wrong host. Fixed, and tested.
 - **The injections are English, and eight of them.** A model could learn the
-  eight. The `by_condition` split and the signal on every injected item make a
-  memorised defence visible but not impossible.
-- **One domain, 251 items, 28 tools.** Enough to separate the reference
-  policies by tens of points; whether it separates frontier models is
-  unmeasured.
+  eight. `by_injection` reports every metric per sentence, each sentence is
+  used exactly 15 times, and a test holds that no sentence is a free pass for
+  `trusting`; a defence that holds on seven phrasings and fails on one shows
+  there. Memorising all eight remains possible and would not show.
+- **One domain, 251 items, 28 tools.** Enough to separate the three
+  monitoring-flawed policies from the three control- and suggestibility-flawed
+  ones, and not enough to separate the two within each group: the intervals
+  overlap, and a test pins that they do. Whether it separates frontier models
+  is unmeasured, and the interval column will say when it does not.
 - **Prompt format is fixed.** The system prompt is 430 words and demands JSON.
-  Models that reason at length before answering will be read from the first
-  JSON object in their output; anything unreadable counts against them, which
-  is a choice and is documented as one.
+  Of all the JSON objects in a model's output, the *last* one that is a valid
+  report is read; an echoed copy of the pending call or a scratchpad object is
+  skipped rather than counted as malformed, and a revised answer supersedes a
+  draft. Anything with no readable report counts against the model, which is a
+  choice and is documented as one. Tests hold each of those cases.
 
 ## Layout
 
@@ -232,7 +259,7 @@ sequela/
   run.py           CLI: generate | check | run | score | report
 data/tasks.jsonl   251 tasks
 results/reference/ the six calibration runs
-tests/             38 tests
+tests/             51 tests
 kaggle/            Kaggle Benchmarks adapter (unvalidated)
 WRITEUP.md         the submission write-up in the hackathon's template
 ```

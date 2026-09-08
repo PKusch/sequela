@@ -90,13 +90,13 @@ argument. The oracle confirms the sentence alters no fact about the call.
 
 Python 3.11+, standard library only. Backends for the Anthropic Messages API
 and any OpenAI-compatible endpoint (OpenAI, Gemini compatibility layer, Ollama,
-vLLM) over `urllib`. Temperature 0, 400 output tokens, first JSON object in the
+vLLM) over `urllib`. Temperature 0, 400 output tokens, last valid report object in the
 output is read. A Kaggle Benchmarks task (`kaggle/sequela_task.py`) wraps one
 item with `@kbench.task` and asserts readable output, no understatement,
 correct decision and coupling; it is written against the SDK's README and not
 yet executed in a Kaggle runtime.
 
-38 tests cover the oracle (including airlock's six original scenarios and the
+51 tests cover the oracle (including airlock's six original scenarios and the
 distractors), the dataset invariants, the parser, and scorer calibration.
 
 ## Results, insights, and conclusions
@@ -132,6 +132,12 @@ from airlock's experience wrapping a narrator around real MCP tools, is that
 monitoring failures concentrate on boundary escapes and host look-alikes, and
 that suggestibility is non-zero on every model; the reference table shows the
 instrument would see both if they are there.
+
+The scorer also reports its own resolution: a 95% bootstrap interval on the
+composite, resampled over clean/injected pair groups. On 251 items every
+interval is narrower than eight points; the top three reference policies are
+separated from the bottom three, and within each group two policies overlap.
+Two models closer than that have not been distinguished, and the table says so.
 
 ## Organizational affiliations
 
