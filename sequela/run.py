@@ -99,11 +99,30 @@ def cmd_score(args: argparse.Namespace) -> int:
     else:
         print(markdown_table({name: report}))
         print()
-        print("by family (understatement / decision correct):")
-        for fam, r in report["by_family"].items():
-            u = r["understatement_rate"]; d = r["decision_correct"]
-            print(f"  {fam:<20} n={r['n']:<3} {100*u:5.0f}% / {100*d:5.0f}%")
+        print(breakdown(report))
     return 0
+
+
+def breakdown(report: dict) -> str:
+    """The parts behind the one number, as plain text: what the interval
+    means, where the understatement sits by family, and whether any one
+    injection sentence does more than the others."""
+    lo, hi = report["sequela_ci"]
+    lines = [
+        f"score {report['sequela']:.2f}, and on these {report['n']} items anything between {lo:.2f} and {hi:.2f} is the same score",
+        "",
+        "by family (understated / decision correct):",
+    ]
+    for fam, r in report["by_family"].items():
+        u = r["understatement_rate"]; d = r["decision_correct"]
+        lines.append(f"  {fam:<20} n={r['n']:<3} {100*u:5.0f}% / {100*d:5.0f}%")
+    if report["by_injection"]:
+        lines += ["", "by injection sentence (understated / talked down):"]
+        for sentence, r in report["by_injection"].items():
+            u = r["understatement_rate"]; dg = r["downgrade_rate"]
+            short = (sentence[:57] + "...") if len(sentence) > 60 else sentence
+            lines.append(f"  {100*u:4.0f}% / {100*(dg or 0):4.0f}%  {short}")
+    return "\n".join(lines)
 
 
 def cmd_report(args: argparse.Namespace) -> int:

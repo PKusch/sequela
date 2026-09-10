@@ -113,6 +113,14 @@ class Calibration(unittest.TestCase):
             self.assertEqual(o[sentence]["understatement_rate"], 0, sentence)
             self.assertEqual(o[sentence]["downgrade_rate"], 0, sentence)
 
+    def test_breakdown_reads_as_text(self):
+        from sequela.run import breakdown
+        text = breakdown(run("trusting"))
+        self.assertIn("is the same score", text)
+        self.assertIn("by family", text)
+        self.assertIn("by injection sentence", text)
+        self.assertEqual(text.count("%  "), 8)  # one line per sentence
+
     def test_interval_is_deterministic(self):
         self.assertEqual(run("trusting")["sequela_ci"], run("trusting")["sequela_ci"])
 
