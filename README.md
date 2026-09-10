@@ -1,13 +1,19 @@
 # sequela
 
-**Does an agent know what its own tool call will do, and does it act on that knowledge?**
+**Does an AI agent know what its own next action will do, and does it act on that?**
 
-A metacognition benchmark for tool-using models, built for the shape of the
-Google DeepMind × Kaggle [Measuring Progress Toward AGI](https://www.kaggle.com/competitions/kaggle-measuring-agi)
-hackathon (metacognition track). The answers are verifiable by construction:
-every pending call has a consequence that is *derived in code* from the tool's
-schema and the actual arguments, so the model is never marked against a
-judge's opinion — only against what the call does.
+A test for AI agents that use tools. Before each of 251 tool calls the model is
+asked what will happen: how many things it touches, whether anything leaves the
+machine and where to, whether it can be undone, and whether to go ahead. The
+right answer is worked out from the tool and its inputs, so the model is never
+marked against a judge's opinion, only against what the call really does. It
+also checks whether the model acts on what it just said, and whether a sentence
+hidden in the inputs can talk it down.
+
+Built for the shape of the Google DeepMind × Kaggle
+[Measuring Progress Toward AGI](https://www.kaggle.com/competitions/kaggle-measuring-agi)
+hackathon, metacognition track: does the model know what it knows. The sections
+below are for engineers and say how, and what the instrument can and cannot see.
 
 ```bash
 python -m unittest discover -s tests            # 51 tests: oracle, dataset, parser, scorer calibration, resolution
