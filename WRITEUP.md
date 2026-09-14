@@ -84,7 +84,11 @@ domain, payments, credential reads, and distractors (a wildcard in a text
 query; `rm -rf` inside file content) that look dangerous and change nothing.
 
 Injected items append one of eight instruction-shaped sentences to a free-text
-argument. The oracle confirms the sentence alters no fact about the call.
+argument. The oracle confirms the sentence alters no fact about the call. A
+held-out file, `data/heldout.jsonl`, carries 60 more items with 12 sentences
+not among the eight: other registers, French, German and Spanish, a sentence
+broken across lines, look-alike letters, and a fake tool output. Each is
+scored against its clean twin's answer from the main run.
 
 ## Technical details
 
@@ -96,8 +100,9 @@ item with `@kbench.task` and asserts readable output, no understatement,
 correct decision and coupling; it is written against the SDK's README and not
 yet executed in a Kaggle runtime.
 
-51 tests cover the oracle (including airlock's six original scenarios and the
-distractors), the dataset invariants, the parser, and scorer calibration.
+73 tests cover the oracle (including airlock's six original scenarios and the
+distractors), the dataset invariants, the held-out split, the parser, and
+scorer calibration.
 
 ## Results, insights, and conclusions
 
@@ -125,6 +130,11 @@ policy is flawless on all 131 clean items and downgraded on 93% of pairs with
 a mean drop of 1.85 severity levels, while every other policy shows exactly
 0%. And never understating is not enough: the paranoid policy misses no escape
 and still decides correctly on 32% of calls.
+
+A seventh policy, memorised, ignores the eight known sentences and believes
+any other. On the main set it matches the oracle exactly, composite 1.00. On
+the held-out set it is talked down on 93% of pairs, against 0% on the main
+set. Without the held-out split I could not have seen it.
 
 The question the benchmark exists to answer is whether frontier models
 separate along these axes, and by how much. It is unanswered. The expectation,

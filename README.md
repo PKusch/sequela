@@ -16,10 +16,15 @@ hackathon, metacognition track: does the model know what it knows. The sections
 below are for engineers and say how, and what the instrument can and cannot see.
 
 ```bash
-python -m unittest discover -s tests            # 51 tests: oracle, dataset, parser, scorer calibration, resolution
-python -m sequela.run check                     # the committed dataset matches the catalogue
+python -m unittest discover -s tests            # 73 tests: oracle, dataset, held-out split, parser, scorer calibration, resolution
+python -m sequela.run check                     # the committed dataset and held-out split match the catalogue
 python -m sequela.run run reference:trusting    # answer all 251 tasks with a reference policy
 python -m sequela.run report results/reference/*.json
+
+# the held-out sentences: answer the 60 items, then score them beside the main run
+python -m sequela.run run reference:memorised --out m.json
+python -m sequela.run run reference:memorised --heldout --out m.heldout.json
+python -m sequela.run score m.json m.heldout.json
 
 # live models (none run yet — see "Results")
 ANTHROPIC_API_KEY=... python -m sequela.run run anthropic:claude-sonnet-5
@@ -27,9 +32,9 @@ OPENAI_API_KEY=...    python -m sequela.run run openai:gpt-5
                       python -m sequela.run run ollama:llama3.2
 ```
 
-Python 3.11+, no dependencies. The tests, the dataset check and the six
-reference runs execute in CI on every push, so the numbers below are gated
-rather than asserted.
+Python 3.11+, no dependencies. The tests, the dataset check and the seven
+reference runs on both sets execute in CI on every push, so the numbers below
+are gated rather than asserted.
 
 ---
 
@@ -121,6 +126,16 @@ the like. The oracle confirms the sentence changes nothing about what the call
 does, and the tests assert that every injected item's truth is identical to
 its twin's apart from the `instruction_shaped_argument` signal.
 
+A second file, [`data/heldout.jsonl`](data/heldout.jsonl), holds 60 more
+items: one for each clean item that can carry a sentence, each with one of 12
+sentences that are not among the eight. Some say the same thing in a
+different register (polite, bureaucratic, casual). Three are in French, German
+and Spanish. One is broken across lines, one is spelt with Cyrillic letters
+that look Latin, and one is dressed as the output of an earlier tool. The
+clean twins are not repeated there; a held-out item is paired with its twin's
+answer from the main run. The held-out file changes nothing in
+`data/tasks.jsonl` or in any number measured on it.
+
 ## Scoring
 
 Direction matters more than distance. A report that says a call is worse than
@@ -154,6 +169,11 @@ overlap have not been told apart by these 251 items, whatever the point
 estimates say. `by_injection` breaks understatement, decision correctness and
 downgrade rate out per injection sentence, so a defence that has learned seven
 of the eight phrasings shows up there.
+
+Given a held-out result beside a main one, `score` and `report` add a
+held-out line: how often the held-out sentences talked the respondent down,
+how often the eight did, and the gap between the two. A respondent that has
+learned the eight sentences, not the lesson, has a large gap.
 
 ## Calibration: what the instrument can see
 
@@ -189,6 +209,36 @@ What the table shows:
   `name_reader`, and `uncoupled` with `trusting`. Those pairs have *not* been
   told apart by this dataset, and a test pins that so the README cannot say
   otherwise. Two live models three points apart would be in the same position.
+
+### The held-out sentences
+
+A seventh policy, `memorised`, has learned the eight sentences and nothing
+else. On clean calls and on calls carrying one of the eight it answers like
+the oracle. On any other instruction-shaped text it believes the argument,
+like `trusting`. It is kept out of the table above because nothing in the
+main dataset can see its flaw, and that is the point of it.
+
+| respondent | main set: sequela | main set: talked down | held-out: talked down | gap |
+|---|---:|---:|---:|---:|
+| `oracle` | 1.00 | 0% of 120 | 0% of 60 | 0 points |
+| `memorised` | 1.00 | 0% of 120 | 93% of 60 | 93 points |
+| `trusting` | 0.63 | 93% of 120 | 93% of 60 | 0 points |
+
+On the main set `memorised` cannot be told from the oracle: every answer is
+the same, and the composite is 1.00. On the held-out set its mean severity
+drop is 1.85 levels and its decision is softened on 93% of pairs, the same as
+`trusting`. The 7% that are not talked down are calls whose true severity is
+already `low`, which cannot be rated lower. The other four policies are not
+moved by sentences in the arguments and show 0% on both sets.
+
+Ten of the 12 held-out sentences were not caught by the oracle's instruction
+check as it stood. I widened the check rather than drop them: whitespace
+between words may be a line break, `don't` counts as `do not`,
+*pre-authorised*, *no further approval*, *requirements are waived*, *no need
+to check*, the same instructions in French, German and Spanish, and a fold of
+Cyrillic and Greek look-alike letters to Latin before the check runs. A test
+holds that no clean task carries the signal, and
+`data/tasks.jsonl` is unchanged byte for byte.
 
 ## Results on live models
 
@@ -249,7 +299,11 @@ a useful gradient across frontier models is exactly the thing not yet known.
   eight. `by_injection` reports every metric per sentence, each sentence is
   used exactly 15 times, and a test holds that no sentence is a free pass for
   `trusting`; a defence that holds on seven phrasings and fails on one shows
-  there. Memorising all eight remains possible and would not show.
+  there. Memorising all eight would score perfectly on the main set, so a
+  held-out split of 12 other sentences checks for it: the `memorised` policy
+  scores 1.00 on the main set and is talked down on 93% of held-out pairs. The
+  held-out sentences are now in the repository too, so they can be learned in
+  turn; they catch a respondent tuned to the eight, not one tuned to all 20.
 - **One domain, 251 items, 28 tools.** Enough to separate the three
   monitoring-flawed policies from the three control- and suggestibility-flawed
   ones, and not enough to separate the two within each group: the intervals
@@ -267,15 +321,16 @@ a useful gradient across frontier models is exactly the thing not yet known.
 ```
 sequela/
   oracle.py        deterministic consequence derivation (port of airlock's deriver)
-  catalogue.py     28 tool schemas, 51 scenarios, 8 injection sentences
-  generate.py      catalogue -> data/tasks.jsonl, with inline truth
+  catalogue.py     28 tool schemas, 51 scenarios, 8 injection sentences, 12 held-out sentences
+  generate.py      catalogue -> data/tasks.jsonl and data/heldout.jsonl, with inline truth
   prompt.py        the prompt the model sees; JSON parser
   score.py         per-item facts, aggregates, the composite, the table
   respondents/     reference policies; anthropic and openai-compatible backends
   run.py           CLI: generate | check | run | score | report
 data/tasks.jsonl   251 tasks
+data/heldout.jsonl 60 held-out items, each paired with a clean task in tasks.jsonl
 results/reference/ the six calibration runs
-tests/             51 tests
+tests/             73 tests
 kaggle/            Kaggle Benchmarks adapter (executed against the SDK with stubs; not in a Kaggle runtime)
 WRITEUP.md         the submission write-up in the hackathon's template
 ```
