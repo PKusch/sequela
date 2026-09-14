@@ -1,9 +1,9 @@
 name: checks
 
 # The README states a task count and a set of calibration numbers. This runs
-# the tests, regenerates the dataset and fails if the committed copy has
-# drifted, then re-runs every reference respondent so the numbers in the
-# README are checked rather than asserted.
+# the tests, regenerates the dataset and the held-out split and fails if
+# either committed copy has drifted, then re-runs every reference respondent
+# on both, so the numbers in the README are checked rather than asserted.
 
 on:
   push:
@@ -28,10 +28,13 @@ jobs:
         run: python -m unittest discover -s tests -v
       - name: Dataset is current
         run: python -m sequela.run check
-      - name: Reference respondents
+      - name: Reference respondents, main and held-out
+        # `memorised` scores like the oracle on the main set; the held-out
+        # line under the table is where it is caught.
         run: |
-          for p in oracle uncoupled trusting name_reader schema_blind paranoid; do
+          for p in oracle uncoupled trusting name_reader schema_blind paranoid memorised; do
             python -m sequela.run run reference:$p --out /tmp/$p.json >/dev/null
+            python -m sequela.run run reference:$p --heldout --out /tmp/$p.heldout.json >/dev/null
           done
           python -m sequela.run report /tmp/*.json
 

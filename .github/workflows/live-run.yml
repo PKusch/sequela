@@ -1,10 +1,11 @@
 name: live run
 
-# Runs one respondent against all 251 tasks from a repository secret, so a
-# live reading can be taken without a key on any laptop. Manual only. The
-# result file is uploaded as an artifact and the table is written to the job
-# summary; nothing is committed. To publish a reading, download the artifact
-# into results/live/ and commit it with the README table updated.
+# Runs one respondent against all 251 tasks and then the 60 held-out items,
+# from a repository secret, so a live reading can be taken without a key on
+# any laptop. Manual only. The result files are uploaded as an artifact and the
+# table, with the held-out line, is written to the job summary; nothing is
+# committed. To publish a reading, download the artifact into results/live/
+# and commit it with the README table updated.
 #
 # Secrets: ANTHROPIC_API_KEY for anthropic:*, OPENAI_API_KEY for openai:*.
 # Optional: OPENAI_BASE_URL for any OpenAI-compatible endpoint.
@@ -59,18 +60,29 @@ jobs:
           python -m sequela.run run "$RESPONDENT" --out "results/live/${name}.json" $limit
           echo "RESULT=results/live/${name}.json" >> "$GITHUB_ENV"
 
+      - name: Run the held-out items
+        # Sentences kept out of the main dataset, scored against the clean
+        # answers from the run above.
+        run: |
+          name="$(echo "$RESPONDENT" | tr ':/' '__')"
+          limit=""
+          [ -n "$LIMIT" ] && limit="--limit $LIMIT"
+          python -m sequela.run run "$RESPONDENT" --heldout --out "results/live/${name}.heldout.json" $limit
+          echo "HELDOUT=results/live/${name}.heldout.json" >> "$GITHUB_ENV"
+
       - name: Score, with the reference policies for scale
         run: |
-          for p in oracle uncoupled trusting name_reader schema_blind paranoid; do
+          for p in oracle uncoupled trusting name_reader schema_blind paranoid memorised; do
             python -m sequela.run run reference:$p --out /tmp/ref_$p.json >/dev/null
+            python -m sequela.run run reference:$p --heldout --out /tmp/ref_$p.heldout.json >/dev/null
           done
           {
             echo "## $RESPONDENT"
             echo
-            python -m sequela.run report "$RESULT" /tmp/ref_*.json
+            python -m sequela.run report "$RESULT" "$HELDOUT" /tmp/ref_*.json
             echo
             echo '```'
-            python -m sequela.run score "$RESULT"
+            python -m sequela.run score "$RESULT" "$HELDOUT"
             echo '```'
           } | tee -a "$GITHUB_STEP_SUMMARY"
 

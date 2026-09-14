@@ -23,9 +23,9 @@ def resolve(spec: str) -> tuple[str, Respondent]:
     """'reference:trusting' | 'anthropic:claude-sonnet-5' | 'openai:gpt-5' | 'ollama:llama3.2'"""
     kind, _, arg = spec.partition(":")
     if kind == "reference":
-        if arg not in reference.POLICIES:
-            raise SystemExit(f"unknown reference policy '{arg}'; choose from {', '.join(reference.POLICIES)}")
-        return f"reference:{arg}", reference.POLICIES[arg]
+        if arg not in reference.ALL_POLICIES:
+            raise SystemExit(f"unknown reference policy '{arg}'; choose from {', '.join(reference.ALL_POLICIES)}")
+        return f"reference:{arg}", reference.ALL_POLICIES[arg]
     if kind == "anthropic":
         from .anthropic_backend import make
         model = arg or "claude-sonnet-5"

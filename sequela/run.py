@@ -1,12 +1,14 @@
 """
 Command line.
 
-  python -m sequela.run generate                      # rebuild data/tasks.jsonl
+  python -m sequela.run generate                      # rebuild data/tasks.jsonl and data/heldout.jsonl
   python -m sequela.run check                         # fail if the committed data has drifted
   python -m sequela.run run reference:trusting        # answer every task, write results/
+  python -m sequela.run run reference:trusting --heldout   # answer the held-out items, write results/*.heldout.json
   python -m sequela.run run anthropic:claude-sonnet-5 --limit 20
   python -m sequela.run run ollama:llama3.2
   python -m sequela.run score results/anthropic_claude-sonnet-5.json
+  python -m sequela.run score results/x.json results/x.heldout.json   # adds the held-out line
   python -m sequela.run report results/reference/*.json   # comparison table
 """
 from __future__ import annotations
@@ -20,9 +22,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from . import __version__
-from .generate import DATA, build, load, write
+from .generate import DATA, HELDOUT, build, build_heldout, load, write, write_heldout
 from .respondents import resolve
-from .score import aggregate, markdown_table
+from .score import aggregate, heldout_suggestibility, markdown_table
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -34,25 +36,35 @@ def _sha(path: Path) -> str:
 def cmd_generate(_: argparse.Namespace) -> int:
     tasks = write()
     print(f"wrote {len(tasks)} tasks to {DATA.relative_to(ROOT)}")
+    held = write_heldout()
+    print(f"wrote {len(held)} held-out items to {HELDOUT.relative_to(ROOT)}")
     return 0
 
 
 def cmd_check(_: argparse.Namespace) -> int:
-    fresh = build()
-    committed = load()
-    if fresh != committed:
-        print("data/tasks.jsonl is out of date with the catalogue; run `python -m sequela.run generate`", file=sys.stderr)
-        return 1
-    print(f"data/tasks.jsonl is current ({len(committed)} tasks, sha {_sha(DATA)})")
-    return 0
+    status = 0
+    for path, fresh, what in ((DATA, build(), "tasks"), (HELDOUT, build_heldout(), "held-out items")):
+        committed = load(path)
+        if fresh != committed:
+            print(f"{path.relative_to(ROOT)} is out of date with the catalogue; run `python -m sequela.run generate`", file=sys.stderr)
+            status = 1
+        else:
+            print(f"{path.relative_to(ROOT)} is current ({len(committed)} {what}, sha {_sha(path)})")
+    return status
+
+
+def _result_name(name: str) -> str:
+    return name.replace(":", "_").replace("/", "_")
 
 
 def cmd_run(args: argparse.Namespace) -> int:
     name, respond = resolve(args.respondent)
-    tasks = load()
+    source = HELDOUT if args.heldout else DATA
+    tasks = load(source)
     if args.limit:
         tasks = tasks[: args.limit]
-    out = Path(args.out) if args.out else ROOT / "results" / (name.replace(":", "_").replace("/", "_") + ".json")
+    suffix = ".heldout.json" if args.heldout else ".json"
+    out = Path(args.out) if args.out else ROOT / "results" / (_result_name(name) + suffix)
     out.parent.mkdir(parents=True, exist_ok=True)
     responses: dict[str, dict] = {}
     started = time.time()
@@ -70,36 +82,95 @@ def cmd_run(args: argparse.Namespace) -> int:
         "sequela_version": __version__,
         "respondent": name,
         "created": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-        "tasks_sha": _sha(DATA),
+        "tasks_sha": _sha(source),
         "n": len(tasks),
         "seconds": round(time.time() - started, 1),
         "responses": responses,
     }
+    if args.heldout:
+        record["split"] = "heldout"
     out.write_text(json.dumps(record, indent=1, ensure_ascii=False, sort_keys=True) + "\n")
     print(f"wrote {out.relative_to(ROOT) if out.is_relative_to(ROOT) else out}")
+    if args.heldout:
+        main_path = ROOT / "results" / (_result_name(name) + ".json")
+        if main_path.exists() and not args.out:
+            main = _read_result(main_path)
+            print(heldout_line(_heldout_report(main, _read_result(out))))
+        else:
+            print("held-out items are scored against the clean answers of a main run:")
+            print(f"  python -m sequela.run score <main result> {out}")
+        return 0
     report = aggregate(tasks, {k: v["parsed"] for k, v in responses.items()})
     print(markdown_table({name: report}))
     return 0
 
 
-def _load_result(path: Path) -> tuple[str, dict]:
+def _read_result(path: Path) -> dict:
     rec = json.loads(path.read_text())
-    tasks = load()
-    if rec.get("tasks_sha") != _sha(DATA):
-        print(f"warning: {path.name} was produced against a different tasks.jsonl", file=sys.stderr)
+    rec["_split"] = rec.get("split", "main")
+    source = HELDOUT if rec["_split"] == "heldout" else DATA
+    if rec.get("tasks_sha") != _sha(source):
+        print(f"warning: {path.name} was produced against a different {source.name}", file=sys.stderr)
+    return rec
+
+
+def _parsed(rec: dict) -> dict[str, dict | None]:
+    return {k: v["parsed"] for k, v in rec["responses"].items()}
+
+
+def _main_report(rec: dict) -> dict:
     ids = set(rec["responses"])
-    tasks = [t for t in tasks if t["id"] in ids]
-    return rec["respondent"], aggregate(tasks, {k: v["parsed"] for k, v in rec["responses"].items()})
+    tasks = [t for t in load(DATA) if t["id"] in ids]
+    return aggregate(tasks, _parsed(rec))
+
+
+def _heldout_report(main: dict, held: dict) -> dict:
+    ids = set(held["responses"])
+    held_tasks = [t for t in load(HELDOUT) if t["id"] in ids]
+    main_ids = set(main["responses"])
+    main_tasks = [t for t in load(DATA) if t["id"] in main_ids]
+    return heldout_suggestibility(main_tasks, _parsed(main), held_tasks, _parsed(held))
+
+
+def _load_result(path: Path) -> tuple[str, dict]:
+    rec = _read_result(path)
+    return rec["respondent"], _main_report(rec)
+
+
+def _split_results(paths: list[str]) -> tuple[dict[str, dict], dict[str, dict]]:
+    """Result files by respondent, main and held-out apart."""
+    mains: dict[str, dict] = {}
+    helds: dict[str, dict] = {}
+    for p in paths:
+        rec = _read_result(Path(p))
+        (helds if rec["_split"] == "heldout" else mains)[rec["respondent"]] = rec
+    return mains, helds
 
 
 def cmd_score(args: argparse.Namespace) -> int:
-    name, report = _load_result(Path(args.result))
+    mains, helds = _split_results(args.results)
+    if len(mains) != 1 or len(helds) > 1:
+        print("score takes one main result, and optionally that respondent's held-out result", file=sys.stderr)
+        return 2
+    (name, main), = mains.items()
+    report = _main_report(main)
+    held = None
+    if helds:
+        (hname, hrec), = helds.items()
+        if hname != name:
+            print(f"the held-out result is for {hname}, the main result for {name}", file=sys.stderr)
+            return 2
+        held = _heldout_report(main, hrec)
     if args.json:
-        print(json.dumps({"respondent": name, **report}, indent=1))
+        print(json.dumps({"respondent": name, **report, **({"heldout": held} if held else {})}, indent=1))
     else:
         print(markdown_table({name: report}))
         print()
         print(breakdown(report))
+        if held:
+            print()
+            print(heldout_line(held))
+            print(heldout_breakdown(held))
     return 0
 
 
@@ -125,13 +196,48 @@ def breakdown(report: dict) -> str:
     return "\n".join(lines)
 
 
+def heldout_line(h: dict) -> str:
+    """One plain sentence: how often the held-out sentences talked the
+    respondent down, against how often the eight known sentences did."""
+    rate, main_rate, gap = h["downgrade_rate"], h["main_downgrade_rate"], h["gap"]
+    if rate is None or main_rate is None:
+        return "held-out: no readable pairs to compare"
+    points = round(100 * gap)
+    if points > 0:
+        verdict = f"{points} points more often on sentences it had not seen"
+    elif points < 0:
+        verdict = f"{-points} points less often on sentences it had not seen"
+    else:
+        verdict = "no difference between the sentences it had seen and those it had not"
+    return (
+        f"held-out: talked down on {100*rate:.0f}% of {h['pairs']} held-out pairs, "
+        f"against {100*main_rate:.0f}% of {h['main_pairs']} pairs with the eight known sentences; {verdict}"
+    )
+
+
+def heldout_breakdown(h: dict) -> str:
+    lines = ["", "by held-out sentence (talked down):"]
+    for sentence, r in h["by_sentence"].items():
+        flat = " ".join(sentence.split())
+        short = (flat[:57] + "...") if len(flat) > 60 else flat
+        lines.append(f"  {100*(r['downgrade_rate'] or 0):4.0f}%  {short}")
+    return "\n".join(lines)
+
+
 def cmd_report(args: argparse.Namespace) -> int:
-    reports = {}
-    for p in args.results:
-        name, rep = _load_result(Path(p))
-        reports[name] = rep
+    mains, helds = _split_results(args.results)
+    reports = {name: _main_report(rec) for name, rec in mains.items()}
     reports = dict(sorted(reports.items(), key=lambda kv: -kv[1]["sequela"]))
     print(markdown_table(reports))
+    if helds:
+        print()
+        for name in [*reports, *(n for n in helds if n not in reports)]:
+            if name not in helds:
+                continue
+            if name not in mains:
+                print(f"{name}: held-out result given without a main result; skipped")
+                continue
+            print(f"{name}: {heldout_line(_heldout_report(mains[name], helds[name]))}")
     return 0
 
 
@@ -144,14 +250,15 @@ def main(argv: list[str] | None = None) -> int:
     r.add_argument("respondent", help="reference:<policy> | anthropic:<model> | openai:<model> | ollama:<model>")
     r.add_argument("--out")
     r.add_argument("--limit", type=int)
+    r.add_argument("--heldout", action="store_true", help="answer the held-out items (data/heldout.jsonl)")
     r.add_argument("-v", "--verbose", action="store_true")
     r.set_defaults(fn=cmd_run)
     s = sub.add_parser("score")
-    s.add_argument("result")
+    s.add_argument("results", nargs="+", metavar="result", help="a main result, and optionally the same respondent's held-out result")
     s.add_argument("--json", action="store_true")
     s.set_defaults(fn=cmd_score)
     rp = sub.add_parser("report")
-    rp.add_argument("results", nargs="+")
+    rp.add_argument("results", nargs="+", help="main and held-out results; held-out ones are matched by respondent")
     rp.set_defaults(fn=cmd_report)
     args = ap.parse_args(argv)
     return args.fn(args)

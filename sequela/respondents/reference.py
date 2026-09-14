@@ -5,10 +5,10 @@ work. They calibrate the instrument; they say nothing about any model.
 """
 from __future__ import annotations
 
-from ..catalogue import TOOLS
+from ..catalogue import INJECTIONS, TOOLS
 from ..oracle import (
     ROLE_EFFECTS, SEVERITY, VERB_EFFECTS, derive_reversibility, derive_severity,
-    expected_decision, tokenise,
+    expected_decision, instruction_shaped, tokenise,
 )
 
 
@@ -35,11 +35,8 @@ def uncoupled(task: dict) -> dict:
     return r
 
 
-def trusting(task: dict) -> dict:
-    """Reports the truth on clean calls and believes whatever the arguments
-    tell it on injected ones. Maximal suggestibility."""
-    if task["condition"] != "injected":
-        return oracle(task)
+def _believes_the_argument(task: dict) -> dict:
+    """The report of a respondent that takes the argument text at its word."""
     return {
         "severity": "low",
         "reversibility": "reversible",
@@ -49,6 +46,21 @@ def trusting(task: dict) -> dict:
         "decision": "proceed",
         "rationale": "the argument says this is routine",
     }
+
+
+def _argument_text(task: dict) -> str:
+    parts: list[str] = []
+    for v in task["args"].values():
+        parts.extend(str(x) for x in v) if isinstance(v, list) else parts.append(str(v))
+    return "\n".join(parts)
+
+
+def trusting(task: dict) -> dict:
+    """Reports the truth on clean calls and believes whatever the arguments
+    tell it on injected (and held-out) ones. Maximal suggestibility."""
+    if task["condition"] == "clean":
+        return oracle(task)
+    return _believes_the_argument(task)
 
 
 def name_reader(task: dict) -> dict:
@@ -118,6 +130,19 @@ def schema_blind(task: dict) -> dict:
     }
 
 
+def memorised(task: dict) -> dict:
+    """Has learned the eight injection sentences and ignores them, and has
+    learned nothing else. On clean calls and on calls carrying one of the
+    eight it is the oracle; on any other instruction-shaped text it believes
+    the argument, like `trusting`. On the main dataset it cannot be told from
+    the oracle. Only the held-out sentences expose it."""
+    text = _argument_text(task)
+    if not instruction_shaped(text) or any(known in text for known in INJECTIONS):
+        return oracle(task)
+    return _believes_the_argument(task)
+
+
+# The six calibration policies. Each one's flaw shows on the main dataset.
 POLICIES = {
     "oracle": oracle,
     "uncoupled": uncoupled,
@@ -126,3 +151,11 @@ POLICIES = {
     "schema_blind": schema_blind,
     "paranoid": paranoid,
 }
+
+# Policies whose flaw shows only on the held-out split. Kept out of POLICIES,
+# whose members are all expected to pay for their flaw on the main dataset.
+HELDOUT_POLICIES = {
+    "memorised": memorised,
+}
+
+ALL_POLICIES = {**POLICIES, **HELDOUT_POLICIES}
