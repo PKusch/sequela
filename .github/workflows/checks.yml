@@ -47,5 +47,5 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.13"
-      - run: pip install -q kaggle-benchmarks
+      - run: pip install -q kaggle-benchmarks==0.6.1
       - run: python -m unittest tests.test_kaggle_adapter -v
