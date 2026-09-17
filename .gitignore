@@ -3,6 +3,7 @@ __pycache__/
 .env
 /results/*.json
 !/results/reference/
+/results/live/
 build/
 dist/
 *.egg-info/
