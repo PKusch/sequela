@@ -28,6 +28,8 @@ jobs:
         run: python -m unittest discover -s tests -v
       - name: Dataset is current
         run: python -m sequela.run check
+      - name: README's calibration and held-out tables match a fresh run
+        run: python scripts/check_readme_numbers.py
       - name: Reference respondents, main and held-out
         # `memorised` scores like the oracle on the main set; the held-out
         # line under the table is where it is caught.
