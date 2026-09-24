@@ -16,7 +16,7 @@ hackathon, metacognition track: does the model know what it knows. The sections
 below are for engineers and say how, and what the instrument can and cannot see.
 
 ```bash
-python -m unittest discover -s tests            # 73 tests: oracle, dataset, held-out split, parser, scorer calibration, resolution
+python -m unittest discover -s tests            # 77 tests: oracle, dataset, held-out split, parser, scorer calibration, resolution, command-line mistakes
 python -m sequela.run check                     # the committed dataset and held-out split match the catalogue
 python -m sequela.run run reference:trusting    # answer all 251 tasks with a reference policy
 python -m sequela.run report results/reference/*.json
@@ -332,7 +332,7 @@ sequela/
 data/tasks.jsonl   251 tasks
 data/heldout.jsonl 60 held-out items, each paired with a clean task in tasks.jsonl
 results/reference/ the six calibration runs
-tests/             73 tests
+tests/             77 tests
 kaggle/            Kaggle Benchmarks adapter (executed against the SDK with stubs; not in a Kaggle runtime)
 WRITEUP.md         the submission write-up in the hackathon's template
 ```

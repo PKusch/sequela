@@ -105,8 +105,21 @@ def cmd_run(args: argparse.Namespace) -> int:
     return 0
 
 
+_RESULT_KEYS = {"respondent", "responses", "tasks_sha"}
+
+
 def _read_result(path: Path) -> dict:
-    rec = json.loads(path.read_text())
+    """A result file, or a one-line reason it is not one. A wrong path or the
+    wrong kind of json is the commonest mistake at the command line, and a
+    traceback about a missing key says nothing about what to do."""
+    try:
+        rec = json.loads(path.read_text())
+    except FileNotFoundError:
+        raise SystemExit(f"no such result file: {path}")
+    except (OSError, ValueError) as e:
+        raise SystemExit(f"{path} could not be read as a result file: {e}")
+    if not isinstance(rec, dict) or not _RESULT_KEYS <= rec.keys():
+        raise SystemExit(f"{path} is not a sequela result file (a result has {', '.join(sorted(_RESULT_KEYS))})")
     rec["_split"] = rec.get("split", "main")
     source = HELDOUT if rec["_split"] == "heldout" else DATA
     if rec.get("tasks_sha") != _sha(source):
