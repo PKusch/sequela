@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from sequela.run import main
+from sequela.run import DATA, _sha, main
 
 
 def run_cli(*argv: str) -> tuple[int | str | None, str]:
@@ -46,6 +46,22 @@ class ResultFileMistakes(unittest.TestCase):
         code, _ = run_cli("score", self.write("junk.json", "not json at all"))
         self.assertIsInstance(code, str)
         self.assertIn("could not be read as a result file", code)
+
+    def test_a_result_with_a_response_missing_parsed_says_so(self):
+        sha = _sha(DATA)
+        bad = json.dumps({"respondent": "x", "tasks_sha": sha, "responses": {"t1": {"raw": "h"}}})
+        for cmd in ("score", "report"):
+            code, _ = run_cli(cmd, self.write(f"{cmd}-noparsed.json", bad))
+            self.assertIsInstance(code, str, cmd)
+            self.assertIn("no 'parsed' field", code)
+
+    def test_a_result_with_no_responses_says_so(self):
+        sha = _sha(DATA)
+        for shape in ("{}", "[]"):
+            body = json.dumps({"respondent": "x", "tasks_sha": sha, "responses": json.loads(shape)})
+            code, _ = run_cli("report", self.write(f"empty-{shape[0]}.json", body))
+            self.assertIsInstance(code, str, shape)
+            self.assertIn("no responses to score", code)
 
     def test_a_real_result_still_works(self):
         out = self.tmp / "o.json"

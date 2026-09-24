@@ -120,6 +120,15 @@ def _read_result(path: Path) -> dict:
         raise SystemExit(f"{path} could not be read as a result file: {e}")
     if not isinstance(rec, dict) or not _RESULT_KEYS <= rec.keys():
         raise SystemExit(f"{path} is not a sequela result file (a result has {', '.join(sorted(_RESULT_KEYS))})")
+    responses = rec["responses"]
+    if not isinstance(responses, dict) or not responses:
+        raise SystemExit(f"{path} has no responses to score")
+    unparsed = [k for k, v in responses.items() if not isinstance(v, dict) or "parsed" not in v]
+    if unparsed:
+        raise SystemExit(
+            f"{path} has {len(unparsed)} response(s) with no 'parsed' field "
+            f"(first: {unparsed[0]}); it was not written by this tool"
+        )
     rec["_split"] = rec.get("split", "main")
     source = HELDOUT if rec["_split"] == "heldout" else DATA
     if rec.get("tasks_sha") != _sha(source):
