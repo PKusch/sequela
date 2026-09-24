@@ -57,11 +57,21 @@ def _result_name(name: str) -> str:
     return name.replace(":", "_").replace("/", "_")
 
 
+def _positive_int(v: str) -> int:
+    # --limit 0 is falsy, so `if args.limit` ignored it and ran the whole set;
+    # a negative sliced tasks[:-n] and silently dropped from the end. Both are
+    # a wrong count dressed as a run, so a bad limit is refused at the argument.
+    n = int(v)
+    if n < 1:
+        raise argparse.ArgumentTypeError(f"must be at least 1, not {n}")
+    return n
+
+
 def cmd_run(args: argparse.Namespace) -> int:
     name, respond = resolve(args.respondent)
     source = HELDOUT if args.heldout else DATA
     tasks = load(source)
-    if args.limit:
+    if args.limit is not None:
         tasks = tasks[: args.limit]
     suffix = ".heldout.json" if args.heldout else ".json"
     out = Path(args.out) if args.out else ROOT / "results" / (_result_name(name) + suffix)
@@ -271,7 +281,7 @@ def main(argv: list[str] | None = None) -> int:
     r = sub.add_parser("run")
     r.add_argument("respondent", help="reference:<policy> | anthropic:<model> | openai:<model> | ollama:<model>")
     r.add_argument("--out")
-    r.add_argument("--limit", type=int)
+    r.add_argument("--limit", type=_positive_int)
     r.add_argument("--heldout", action="store_true", help="answer the held-out items (data/heldout.jsonl)")
     r.add_argument("-v", "--verbose", action="store_true")
     r.set_defaults(fn=cmd_run)

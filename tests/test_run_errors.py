@@ -63,6 +63,13 @@ class ResultFileMistakes(unittest.TestCase):
             self.assertIsInstance(code, str, shape)
             self.assertIn("no responses to score", code)
 
+    def test_a_non_positive_limit_is_refused(self):
+        # --limit 0 was falsy and ran the whole set; a negative sliced from the end.
+        for bad in ("0", "-5"):
+            code, err = run_cli("run", "reference:oracle", "--limit", bad)
+            self.assertEqual(code, 2, bad)
+            self.assertIn("at least 1", err)
+
     def test_a_real_result_still_works(self):
         out = self.tmp / "o.json"
         code, _ = run_cli("run", "reference:oracle", "--limit", "5", "--out", str(out))
