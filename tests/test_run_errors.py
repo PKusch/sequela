@@ -70,6 +70,21 @@ class ResultFileMistakes(unittest.TestCase):
             self.assertEqual(code, 2, bad)
             self.assertIn("at least 1", err)
 
+    def test_a_bad_output_path_is_refused_before_any_task_is_answered(self):
+        # the result is written last, so a bad --out used to surface only after the
+        # whole run: against a hosted model, a run paid for and thrown away
+        import sequela.run as run
+        calls = []
+        real = run.resolve
+        run.resolve = lambda name: ("counting", lambda task: calls.append(task["id"]))
+        try:
+            code, _ = run_cli("run", "x:y", "--limit", "3", "--out", str(self.tmp))
+        finally:
+            run.resolve = real
+        self.assertIsInstance(code, str)
+        self.assertIn("is a directory", code)
+        self.assertEqual(calls, [], "no task was answered")
+
     def test_a_real_result_still_works(self):
         out = self.tmp / "o.json"
         code, _ = run_cli("run", "reference:oracle", "--limit", "5", "--out", str(out))

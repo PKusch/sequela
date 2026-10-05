@@ -16,6 +16,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import sys
 import time
 from datetime import datetime, timezone
@@ -67,6 +68,21 @@ def _positive_int(v: str) -> int:
     return n
 
 
+def _check_output(out: Path) -> None:
+    """Make sure the result can be written before any task is answered. The file
+    is written last, so a bad --out used to surface only after the whole run, and
+    against a hosted model that is a run paid for and thrown away."""
+    if out.is_dir():
+        raise SystemExit(f"--out {out} is a directory; give a file name")
+    try:
+        out.parent.mkdir(parents=True, exist_ok=True)
+    except OSError as e:
+        raise SystemExit(f"cannot create the folder for {out}: {e.strerror or e}")
+    target = out if out.exists() else out.parent
+    if not os.access(target, os.W_OK):
+        raise SystemExit(f"cannot write to {out}: permission denied")
+
+
 def cmd_run(args: argparse.Namespace) -> int:
     name, respond = resolve(args.respondent)
     source = HELDOUT if args.heldout else DATA
@@ -75,7 +91,7 @@ def cmd_run(args: argparse.Namespace) -> int:
         tasks = tasks[: args.limit]
     suffix = ".heldout.json" if args.heldout else ".json"
     out = Path(args.out) if args.out else ROOT / "results" / (_result_name(name) + suffix)
-    out.parent.mkdir(parents=True, exist_ok=True)
+    _check_output(out)
     responses: dict[str, dict] = {}
     started = time.time()
     for i, t in enumerate(tasks, 1):
