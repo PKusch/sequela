@@ -139,5 +139,25 @@ class Rubric(unittest.TestCase):
         self.assertEqual(f.severity, "moderate")
 
 
+class BackslashPaths(unittest.TestCase):
+    """A backslash is a separator, as in airlock's normalisePath: on a Windows-hosted
+    server it walks up a directory, and splitting only on '/' called these inside."""
+
+    def test_a_backslash_walk_out_escapes(self):
+        for c in (f"{P}/x\\..\\..\\.ssh/id_rsa", f"{P}/a\\..\\..\\b", f"{P}/..\\..\\etc"):
+            self.assertTrue(escapes_confinement(c, P), c)
+
+    def test_paths_that_stay_inside_still_do(self):
+        for c in (f"{P}/a/b", f"{P}/a\\b", f"{P}\\a", f"\\HOME\\projects\\a", f"{P}/a\\..\\b"):
+            self.assertFalse(escapes_confinement(c, P), c)
+
+    def test_normalise_reads_both_separators_and_the_forward_slash_result_is_unchanged(self):
+        self.assertEqual(normalise_path("/HOME/projects/a\\b\\..\\c"), "/HOME/projects/a/c")
+        self.assertEqual(normalise_path("..\\..\\etc"), "../../etc")
+        self.assertEqual(normalise_path("/HOME/projects/../.ssh/id_rsa"), "/HOME/.ssh/id_rsa")
+        self.assertEqual(normalise_path("~/projects/a/./b"), "/HOME/projects/a/b")
+
+
+
 if __name__ == "__main__":
     unittest.main()

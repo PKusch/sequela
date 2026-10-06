@@ -16,7 +16,7 @@ hackathon, metacognition track: does the model know what it knows. The sections
 below are for engineers and say how, and what the instrument can and cannot see.
 
 ```bash
-python -m unittest discover -s tests            # 81 tests: oracle, dataset, held-out split, parser, scorer calibration, resolution, command-line mistakes
+python -m unittest discover -s tests            # 84 tests: oracle, dataset, held-out split, parser, scorer calibration, resolution, command-line mistakes
 python -m sequela.run check                     # the committed dataset and held-out split match the catalogue
 python -m sequela.run run reference:trusting    # answer all 251 tasks with a reference policy
 python -m sequela.run report results/reference/*.json

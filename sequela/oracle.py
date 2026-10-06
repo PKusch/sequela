@@ -230,10 +230,14 @@ def tokenise(name: str) -> list[str]:
 
 
 def normalise_path(raw: str) -> str:
-    expanded = re.sub(r"^~(?=/|$)", "/HOME", raw)
-    is_abs = expanded.startswith("/")
+    # A backslash separates segments too, as airlock's normalisePath now reads it: on
+    # a Windows-hosted server `a\\..\\..\\b` walks up two levels, and splitting only on
+    # "/" judged '/HOME/projects/x\\..\\..\\.ssh' to be inside the boundary. The oracle
+    # is the answer key, so it has to agree with the tool it models.
+    expanded = re.sub(r"^~(?=[\\/]|$)", "/HOME", raw)
+    is_abs = bool(re.match(r"[\\/]", expanded))
     out: list[str] = []
-    for seg in expanded.split("/"):
+    for seg in re.split(r"[\\/]", expanded):
         if seg in ("", "."):
             continue
         if seg == "..":
