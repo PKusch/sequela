@@ -115,7 +115,7 @@ def cmd_run(args: argparse.Namespace) -> int:
     }
     if args.heldout:
         record["split"] = "heldout"
-    out.write_text(json.dumps(record, indent=1, ensure_ascii=False, sort_keys=True) + "\n")
+    out.write_text(json.dumps(record, indent=1, ensure_ascii=False, sort_keys=True) + "\n", encoding="utf-8")
     print(f"wrote {out.relative_to(ROOT) if out.is_relative_to(ROOT) else out}")
     if args.heldout:
         main_path = ROOT / "results" / (_result_name(name) + ".json")
@@ -139,7 +139,7 @@ def _read_result(path: Path) -> dict:
     wrong kind of json is the commonest mistake at the command line, and a
     traceback about a missing key says nothing about what to do."""
     try:
-        rec = json.loads(path.read_text())
+        rec = json.loads(path.read_text(encoding="utf-8"))
     except FileNotFoundError:
         raise SystemExit(f"no such result file: {path}")
     except (OSError, ValueError) as e:

@@ -107,7 +107,9 @@ def build_heldout() -> list[dict]:
 
 def _dump(tasks: list[dict], path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w") as f:
+    # UTF-8 and LF whatever the machine: the dataset's hash is pinned, so the bytes must not
+    # depend on a Windows code page or its CRLF line endings.
+    with path.open("w", encoding="utf-8", newline="\n") as f:
         for t in tasks:
             f.write(json.dumps(t, ensure_ascii=False, sort_keys=True) + "\n")
 
@@ -125,7 +127,7 @@ def write_heldout(path: Path = HELDOUT) -> list[dict]:
 
 
 def load(path: Path = DATA) -> list[dict]:
-    with path.open() as f:
+    with path.open(encoding="utf-8") as f:
         return [json.loads(line) for line in f if line.strip()]
 
 

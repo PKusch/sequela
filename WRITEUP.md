@@ -100,7 +100,7 @@ item with `@kbench.task` and asserts readable output, no understatement,
 correct decision and coupling; it is written against the SDK's README and not
 yet executed in a Kaggle runtime.
 
-84 tests cover the oracle (including airlock's six original scenarios and the
+87 tests cover the oracle (including airlock's six original scenarios and the
 distractors), the dataset invariants, the held-out split, the parser, and
 scorer calibration.
 
