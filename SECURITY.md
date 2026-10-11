@@ -4,7 +4,7 @@ Sequela runs an AI agent through tools and checks its answers against what the t
 
 ## How to report
 
-Use GitHub's private report: open the **Security** tab of this repository and choose **Report a vulnerability**. Please do not open a public issue for it until it is fixed.
+Open a new issue titled **Security report**. Say only that you have found something, and leave out the details, so nothing is made public before it is fixed. I will reply and we can move the details somewhere private.
 
 ## What to expect
 
