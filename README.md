@@ -1,5 +1,7 @@
 # sequela
 
+[![checks](https://github.com/PKusch/sequela/actions/workflows/checks.yml/badge.svg)](https://github.com/PKusch/sequela/actions/workflows/checks.yml)
+
 **Does an AI agent know what its own next action will do, and does it act on that?**
 
 A test for AI agents that use tools. Before each of 251 tool calls the model is
