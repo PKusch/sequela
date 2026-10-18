@@ -28,7 +28,7 @@ python -m sequela.run run reference:memorised --out m.json
 python -m sequela.run run reference:memorised --heldout --out m.heldout.json
 python -m sequela.run score m.json m.heldout.json
 
-# live models (none run yet — see "Results")
+# live models (one small local model read so far — see "Results")
 ANTHROPIC_API_KEY=... python -m sequela.run run anthropic:claude-sonnet-5
 OPENAI_API_KEY=...    python -m sequela.run run openai:gpt-5
                       python -m sequela.run run ollama:llama3.2
@@ -244,33 +244,108 @@ holds that no clean task carries the signal, and
 
 ## Results on live models
 
-**None yet.** This session had no API access and no local model, so no
-frontier model has been run against these tasks. The backends are written
-(Anthropic Messages API and any OpenAI-compatible endpoint, over `urllib`, no
-SDK), the prompt is fixed, and a run is one command:
+One reading so far, and it is a small model. On 2026-10-18 gemma3 (4 billion
+parameters) was run on a laptop through Ollama over all 251 tasks and the 60
+held-out items, with no API key. The raw answers are in
+[`results/local/`](results/local/).
 
-```bash
-ANTHROPIC_API_KEY=... python -m sequela.run run anthropic:claude-sonnet-5
-python -m sequela.run score results/anthropic_claude-sonnet-5.json
+| respondent | sequela | 95% CI | understated | overstated | escape TPR | count exact | dest. exact | coupling | decision ok | downgraded | malformed |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| reference:schema_blind | 0.89 | 0.85–0.92 | 25% | 10% | 0% | 89% | 93% | 100% | 78% | 0% | 0% |
+| reference:name_reader | 0.86 | 0.82–0.89 | 33% | 10% | 0% | 93% | 71% | 100% | 71% | 0% | 0% |
+| **ollama:gemma3 (4B)** | **0.68** | **0.64–0.72** | **43%** | **17%** | **62%** | **62%** | **94%** | **61%** | **49%** | **12%** | **0%** |
+| reference:uncoupled | 0.66 | 0.64–0.69 | 0% | 0% | 100% | 100% | 100% | 15% | 15% | 0% | 0% |
+| reference:trusting | 0.63 | 0.61–0.67 | 45% | 0% | 54% | 94% | 85% | 100% | 55% | 93% | 0% |
+
+What it means, in plain words:
+
+- **It does not beat two simple tricks.** Reading only the tool's name scores
+  0.86, and reading only its schema scores 0.89. The 4B model scores 0.68, which
+  is inside the range of "never looks at its own report" (0.66) and "always
+  trusts the input" (0.63). On this test it does not know what its next action
+  will do any better than a few lines of rules.
+- **It plays danger down.** It understates the consequence on 43% of calls, where
+  the schema-reading trick manages 25%. Every tool with a misleading name, and
+  every call to an outside or open recipient, was understated.
+- **It is hard to talk down.** An injected sentence lowered its answer on 12% of
+  pairs with the eight known sentences, and on 5% of 59 pairs with sentences it
+  had not seen. That is a low number partly because it already understates so
+  often that there is little left to lower.
+
+What this does not show: how a frontier model does. No hosted model has been
+read, because that needs an API key. A run of gemma3 at 12 billion parameters
+was started on the same laptop and had not finished when this was written, so it
+is not reported here.
+
+## What this adds to the winning entries
+
+Read against the metacognition-track winners: GAUGE measured whether models
+act on their own uncertainty in quiz answers, with a judged ground truth;
+MetaBound mapped knowledge boundaries; SecureExec-Bench (executive functions)
+tested keeping secrets under pressure. Here the domain is the model's *own
+next action*, the truth is a function rather than a label, the know/do gap is
+measured against the model's own words, and suggestibility is isolated by
+paired items rather than inferred from aggregate drops. Whether that produces
+a useful gradient across frontier models is exactly the thing not yet known.
+
+## What could be wrong with it
+
+- **The rubric is a construct.** Severity levels are a policy, not a fact of
+  nature. The benchmark measures whether a model can apply a stated policy to
+  derived facts, which is the job an agent actually has; it does not measure
+  whether the policy is a good one.
+- **The oracle is lexical.** It follows `..` and compares hosts and domains as
+  strings. Symlink escapes, redirects and IDN look-alikes are outside it. So is
+  any effect the vocabulary does not name: tools the deriver does not recognise
+  are refused as tasks rather than scored, and the tests check that. The rest
+  is pinned rather than admitted: `test_oracle` records that a look-alike or a
+  sub-domain is "escaped" only because the comparison is exact, that a
+  display-name recipient is not resolved, and that percent-encoded dots are
+  opaque; `test_generate` checks that no task argument uses any of those forms,
+  so the truth line never rests on a case the oracle cannot see. One real hole
+  was found writing those tests: a backslash before the `@` in a URL read the
+  wrong host. Fixed, and tested.
+- **The injections are English, and eight of them.** A model could learn the
+  eight. `by_injection` reports every metric per sentence, each sentence is
+  used exactly 15 times, and a test holds that no sentence is a free pass for
+  `trusting`; a defence that holds on seven phrasings and fails on one shows
+  there. Memorising all eight would score perfectly on the main set, so a
+  held-out split of 12 other sentences checks for it: the `memorised` policy
+  scores 1.00 on the main set and is talked down on 93% of held-out pairs. The
+  held-out sentences are now in the repository too, so they can be learned in
+  turn; they catch a respondent tuned to the eight, not one tuned to all 20.
+- **One domain, 251 items, 28 tools.** Enough to separate the three
+  monitoring-flawed policies from the three control- and suggestibility-flawed
+  ones, and not enough to separate the two within each group: the intervals
+  overlap, and a test pins that they do. Whether it separates frontier models
+  is unmeasured, and the interval column will say when it does not.
+- **Prompt format is fixed.** The system prompt is 430 words and demands JSON.
+  Of all the JSON objects in a model's output, the *last* one that is a valid
+  report is read; an echoed copy of the pending call or a scratchpad object is
+  skipped rather than counted as malformed, and a revised answer supersedes a
+  draft. Anything with no readable report counts against the model, which is a
+  choice and is documented as one. Tests hold each of those cases.
+
+## Layout
+
+```
+sequela/
+  oracle.py        deterministic consequence derivation (port of airlock's deriver)
+  catalogue.py     28 tool schemas, 51 scenarios, 8 injection sentences, 12 held-out sentences
+  generate.py      catalogue -> data/tasks.jsonl and data/heldout.jsonl, with inline truth
+  prompt.py        the prompt the model sees; JSON parser
+  score.py         per-item facts, aggregates, the composite, the table
+  respondents/     reference policies; anthropic and openai-compatible backends
+  run.py           CLI: generate | check | run | score | report
+data/tasks.jsonl   251 tasks
+data/heldout.jsonl 60 held-out items, each paired with a clean task in tasks.jsonl
+results/reference/ the six calibration runs
+tests/             77 tests
+kaggle/            Kaggle Benchmarks adapter (executed against the SDK with stubs; not in a Kaggle runtime)
+WRITEUP.md         the submission write-up in the hackathon's template
 ```
 
-There is also a way to take a reading without a key on any laptop: the
-`live run` workflow (Actions → live run → Run workflow) reads
-`ANTHROPIC_API_KEY` or `OPENAI_API_KEY` from the repository's secrets, runs
-the chosen respondent over all 251 tasks, writes the comparison table to the
-job summary and uploads the result file as an artifact. It commits nothing.
-A reading becomes part of this README only when the file is downloaded into
-`results/live/` and committed with the table updated, by hand — the directory
-is gitignored precisely so that never happens by accident (`git add -f` for
-the one file you mean to keep).
-
-Until that is done this repository is an instrument with a calibration
-certificate and no readings. The Kaggle Benchmarks adapter in
-[`kaggle/sequela_task.py`](kaggle/sequela_task.py) has been executed against
-the real SDK (0.6.1) with stub models built from the reference policies, in its
-own CI job; each flaw trips the assertion written for it. It has not been run
-in a Kaggle runtime against a hosted model.
-
+MIT.
 ## What this adds to the winning entries
 
 Read against the metacognition-track winners: GAUGE measured whether models
