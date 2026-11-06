@@ -1,15 +1,18 @@
 #!/usr/bin/env python3
-"""The calibration table and the held-out table in README.md are numbers copied
-by hand from a `run` + `report` session. Nothing ever checked that the copy was
-right, or that it stays right as the oracle, a policy or the dataset changes.
+"""The calibration table, the held-out table and the live-model table in
+README.md are numbers copied by hand from a `run` + `report` session. Nothing
+ever checked that the copy was right, or that it stays right as the oracle, a
+policy or the dataset changes.
 
-This recomputes both tables from the committed dataset and the reference
-policies in sequela/respondents, and fails on the first cell that does not match
+This recomputes the tables from the committed dataset, the reference policies
+in sequela/respondents and the live models' committed answers in
+results/local/, and reports every cell that does not match
 what README.md says. It is a diagnosis, not a fix: it does not know which of the
 two sides is wrong, only that they disagree.
 """
 from __future__ import annotations
 
+import json
 import re
 import sys
 from pathlib import Path
@@ -53,7 +56,7 @@ def table_rows(text: str, heading: str) -> list[list[str]]:
     rows = []
     for line in section.splitlines():
         line = line.strip()
-        if not line.startswith("|") or set(line.replace("|", "").strip()) <= {"-", " "}:
+        if not line.startswith("|") or set(line.replace("|", "").strip()) <= {"-", ":", " "}:
             continue
         cells = [c.strip() for c in line.strip("|").split("|")]
         if cells[0] not in ("respondent",):
@@ -65,6 +68,60 @@ def short_name(cell: str) -> str:
     """'`schema_blind` — reads the arguments, never the schema' -> 'schema_blind'."""
     m = re.match(r"`([a-z_]+)`", cell)
     return m.group(1) if m else cell
+
+
+LIVE_HEADING = "## Results on live models"
+LOCAL_RESULTS = ROOT / "results" / "local"
+LIVE_COLUMNS = COLUMNS + [("malformed", lambda r: _pct(r["malformed_rate"]))]
+
+
+def live_name(cell: str) -> str:
+    """'**ollama:gemma3 (4B)**' -> 'ollama:gemma3'. The bold and the size in
+    brackets are for the reader; the respondent name is what the file records."""
+    return re.sub(r"\s*\(.*\)$", "", cell.replace("**", "").strip())
+
+
+def local_results() -> dict[str, dict]:
+    """Committed main-set answers from live models, by respondent."""
+    found = {}
+    for path in sorted(LOCAL_RESULTS.glob("*.json")):
+        rec = json.loads(path.read_text(encoding="utf-8"))
+        if rec.get("split", "main") == "main":
+            found[rec["respondent"]] = rec
+    return found
+
+
+def check_live_table(text: str, main_tasks: list[dict]) -> int:
+    """Each row of the live-model table is either a reference policy, recomputed
+    as above, or a live model, rescored from its committed answers. A row with
+    neither behind it is a number nobody can check, so it fails too."""
+    if LIVE_HEADING not in text:
+        print(f"  ✗ live-model table: no '{LIVE_HEADING}' section in README")
+        return 1
+    problems = 0
+    answers = local_results()
+    rows = table_rows(text, LIVE_HEADING)
+    if not rows:
+        print("  ✗ live-model table: the section has no table")
+        return 1
+    for row in rows:
+        name, cells = live_name(row[0]), [c.replace("**", "") for c in row[1:]]
+        if name.startswith("reference:"):
+            report = aggregate(main_tasks, respond_all(name.split(":", 1)[1], main_tasks))
+        elif name in answers:
+            rec = answers[name]
+            tasks = [t for t in main_tasks if t["id"] in rec["responses"]]
+            report = aggregate(tasks, {k: v["parsed"] for k, v in rec["responses"].items()})
+        else:
+            print(f"  ✗ live-model table: no committed answers in results/local/ for '{name}'")
+            problems += 1
+            continue
+        for (col, f), act in zip(LIVE_COLUMNS, cells):
+            exp = f(report)
+            if exp != act:
+                print(f"  ✗ live-model table, {name}, {col}: README says '{act}', recomputed '{exp}'")
+                problems += 1
+    return problems
 
 
 def main() -> int:
@@ -110,6 +167,9 @@ def main() -> int:
             if exp != act:
                 print(f"  ✗ held-out table, {name}, {col}: README says '{act}', recomputed '{exp}'")
                 problems += 1
+
+    # --- the live-model table ----------------------------------------------------
+    problems += check_live_table(text, main_tasks)
 
     print(f"\n{'✗' if problems else '✓'} {problems} mismatch(es) between README.md's tables and a fresh run")
     return 1 if problems else 0
