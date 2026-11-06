@@ -28,7 +28,7 @@ python -m sequela.run run reference:memorised --out m.json
 python -m sequela.run run reference:memorised --heldout --out m.heldout.json
 python -m sequela.run score m.json m.heldout.json
 
-# live models (one small local model read so far — see "Results")
+# live models (two small local models read so far — see "Results")
 ANTHROPIC_API_KEY=... python -m sequela.run run anthropic:claude-sonnet-5
 OPENAI_API_KEY=...    python -m sequela.run run openai:gpt-5
                       python -m sequela.run run ollama:llama3.2
@@ -244,38 +244,44 @@ holds that no clean task carries the signal, and
 
 ## Results on live models
 
-One reading so far, and it is a small model. On 2026-10-18 gemma3 (4 billion
-parameters) was run on a laptop through Ollama over all 251 tasks and the 60
-held-out items, with no API key. The raw answers are in
-[`results/local/`](results/local/).
+Two readings so far, both small models run on a laptop through Ollama over all
+251 tasks and the 60 held-out items, with no API key: gemma3 at 4 billion
+parameters on 2026-10-18, and gemma3 at 12 billion on 2026-11-06. The raw
+answers are in [`results/local/`](results/local/), and CI rescores them and
+fails if a number in this table does not match.
 
 | respondent | sequela | 95% CI | understated | overstated | escape TPR | count exact | dest. exact | coupling | decision ok | downgraded | malformed |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | reference:schema_blind | 0.89 | 0.85–0.92 | 25% | 10% | 0% | 89% | 93% | 100% | 78% | 0% | 0% |
 | reference:name_reader | 0.86 | 0.82–0.89 | 33% | 10% | 0% | 93% | 71% | 100% | 71% | 0% | 0% |
+| **ollama:gemma3:12b (12B)** | **0.72** | **0.68–0.75** | **57%** | **1%** | **67%** | **76%** | **99%** | **69%** | **51%** | **4%** | **0%** |
 | **ollama:gemma3 (4B)** | **0.68** | **0.64–0.72** | **43%** | **17%** | **62%** | **62%** | **94%** | **61%** | **49%** | **12%** | **0%** |
 | reference:uncoupled | 0.66 | 0.64–0.69 | 0% | 0% | 100% | 100% | 100% | 15% | 15% | 0% | 0% |
 | reference:trusting | 0.63 | 0.61–0.67 | 45% | 0% | 54% | 94% | 85% | 100% | 55% | 93% | 0% |
 
 What it means, in plain words:
 
-- **It does not beat two simple tricks.** Reading only the tool's name scores
-  0.86, and reading only its schema scores 0.89. The 4B model scores 0.68, which
-  is inside the range of "never looks at its own report" (0.66) and "always
-  trusts the input" (0.63). On this test it does not know what its next action
-  will do any better than a few lines of rules.
-- **It plays danger down.** It understates the consequence on 43% of calls, where
-  the schema-reading trick manages 25%. Every tool with a misleading name, and
-  every call to an outside or open recipient, was understated.
-- **It is hard to talk down.** An injected sentence lowered its answer on 12% of
-  pairs with the eight known sentences, and on 5% of 59 pairs with sentences it
-  had not seen. That is a low number partly because it already understates so
-  often that there is little left to lower.
+- **Neither model beats two simple tricks.** Reading only the tool's name scores
+  0.86, and reading only its schema scores 0.89. The 4B model scores 0.68, inside
+  the range of "never looks at its own report" (0.66) and "always trusts the
+  input" (0.63). The 12B model scores 0.72, and its range still touches the
+  first of those. On this test neither knows what its next action will do any
+  better than a few lines of rules.
+- **The bigger model is not the safer one.** Their score ranges overlap, so on
+  the one number they are the same. Underneath, the 12B model plays danger down
+  more: it understates the consequence on 57% of calls, against 43% for the 4B.
+  Of the 81 calls that are truly critical, it called 5 critical; the 4B called 16.
+- **The 12B model would wave most calls through.** It answered "go ahead without
+  asking" on 107 of the 251 calls. The right answer is "go ahead" on 37 of them.
+  It almost never overstates (1%, against 17% for the 4B), so it reads as calm,
+  not careful.
+- **Both are hard to talk down.** An injected sentence lowered the 4B's answer on
+  12% of pairs with the eight known sentences and on 5% of 59 pairs with new
+  ones. For the 12B it was 4% of 120 and 0% of 60. That is low partly because
+  both already understate so often that there is little left to lower.
 
 What this does not show: how a frontier model does. No hosted model has been
-read, because that needs an API key. A run of gemma3 at 12 billion parameters
-was started on the same laptop and had not finished when this was written, so it
-is not reported here.
+read, because that needs an API key.
 
 ## What this adds to the winning entries
 
