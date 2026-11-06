@@ -49,5 +49,6 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.13"
-      - run: pip install -q kaggle-benchmarks==0.6.1
+      # hishel 2.0 (2026-11-05) dropped BaseFilter, which kaggle-benchmarks 0.6.1 imports
+      - run: pip install -q kaggle-benchmarks==0.6.1 "hishel<2"
       - run: python -m unittest tests.test_kaggle_adapter -v
