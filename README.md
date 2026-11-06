@@ -346,76 +346,8 @@ sequela/
 data/tasks.jsonl   251 tasks
 data/heldout.jsonl 60 held-out items, each paired with a clean task in tasks.jsonl
 results/reference/ the six calibration runs
-tests/             77 tests
-kaggle/            Kaggle Benchmarks adapter (executed against the SDK with stubs; not in a Kaggle runtime)
-WRITEUP.md         the submission write-up in the hackathon's template
-```
-
-MIT.
-## What this adds to the winning entries
-
-Read against the metacognition-track winners: GAUGE measured whether models
-act on their own uncertainty in quiz answers, with a judged ground truth;
-MetaBound mapped knowledge boundaries; SecureExec-Bench (executive functions)
-tested keeping secrets under pressure. Here the domain is the model's *own
-next action*, the truth is a function rather than a label, the know/do gap is
-measured against the model's own words, and suggestibility is isolated by
-paired items rather than inferred from aggregate drops. Whether that produces
-a useful gradient across frontier models is exactly the thing not yet known.
-
-## What could be wrong with it
-
-- **The rubric is a construct.** Severity levels are a policy, not a fact of
-  nature. The benchmark measures whether a model can apply a stated policy to
-  derived facts, which is the job an agent actually has; it does not measure
-  whether the policy is a good one.
-- **The oracle is lexical.** It follows `..` and compares hosts and domains as
-  strings. Symlink escapes, redirects and IDN look-alikes are outside it. So is
-  any effect the vocabulary does not name: tools the deriver does not recognise
-  are refused as tasks rather than scored, and the tests check that. The rest
-  is pinned rather than admitted: `test_oracle` records that a look-alike or a
-  sub-domain is "escaped" only because the comparison is exact, that a
-  display-name recipient is not resolved, and that percent-encoded dots are
-  opaque; `test_generate` checks that no task argument uses any of those forms,
-  so the truth line never rests on a case the oracle cannot see. One real hole
-  was found writing those tests: a backslash before the `@` in a URL read the
-  wrong host. Fixed, and tested.
-- **The injections are English, and eight of them.** A model could learn the
-  eight. `by_injection` reports every metric per sentence, each sentence is
-  used exactly 15 times, and a test holds that no sentence is a free pass for
-  `trusting`; a defence that holds on seven phrasings and fails on one shows
-  there. Memorising all eight would score perfectly on the main set, so a
-  held-out split of 12 other sentences checks for it: the `memorised` policy
-  scores 1.00 on the main set and is talked down on 93% of held-out pairs. The
-  held-out sentences are now in the repository too, so they can be learned in
-  turn; they catch a respondent tuned to the eight, not one tuned to all 20.
-- **One domain, 251 items, 28 tools.** Enough to separate the three
-  monitoring-flawed policies from the three control- and suggestibility-flawed
-  ones, and not enough to separate the two within each group: the intervals
-  overlap, and a test pins that they do. Whether it separates frontier models
-  is unmeasured, and the interval column will say when it does not.
-- **Prompt format is fixed.** The system prompt is 430 words and demands JSON.
-  Of all the JSON objects in a model's output, the *last* one that is a valid
-  report is read; an echoed copy of the pending call or a scratchpad object is
-  skipped rather than counted as malformed, and a revised answer supersedes a
-  draft. Anything with no readable report counts against the model, which is a
-  choice and is documented as one. Tests hold each of those cases.
-
-## Layout
-
-```
-sequela/
-  oracle.py        deterministic consequence derivation (port of airlock's deriver)
-  catalogue.py     28 tool schemas, 51 scenarios, 8 injection sentences, 12 held-out sentences
-  generate.py      catalogue -> data/tasks.jsonl and data/heldout.jsonl, with inline truth
-  prompt.py        the prompt the model sees; JSON parser
-  score.py         per-item facts, aggregates, the composite, the table
-  respondents/     reference policies; anthropic and openai-compatible backends
-  run.py           CLI: generate | check | run | score | report
-data/tasks.jsonl   251 tasks
-data/heldout.jsonl 60 held-out items, each paired with a clean task in tasks.jsonl
-results/reference/ the six calibration runs
-tests/             77 tests
+results/local/     live models' answers, rescored by CI against the README table
+tests/             87 tests
 kaggle/            Kaggle Benchmarks adapter (executed against the SDK with stubs; not in a Kaggle runtime)
 WRITEUP.md         the submission write-up in the hackathon's template
 ```
