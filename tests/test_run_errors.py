@@ -115,6 +115,11 @@ class ResultFileMistakes(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertTrue(out.exists())
 
+    def test_report_with_only_held_out_results_says_so(self):
+        code, err = run_cli("report", "results/local/ollama_gemma3_12b.heldout.json")
+        self.assertEqual(code, 2)
+        self.assertIn("needs at least one main result", err)
+
     def test_a_real_result_still_works(self):
         out = self.tmp / "o.json"
         code, _ = run_cli("run", "reference:oracle", "--limit", "5", "--out", str(out))

@@ -285,6 +285,10 @@ def heldout_breakdown(h: dict) -> str:
 
 def cmd_report(args: argparse.Namespace) -> int:
     mains, helds = _split_results(args.results)
+    if not mains:
+        # only held-out files: the table would be a header with no rows
+        print("report needs at least one main result; held-out results are read beside their main one", file=sys.stderr)
+        return 2
     reports = {name: _main_report(rec) for name, rec in mains.items()}
     reports = dict(sorted(reports.items(), key=lambda kv: -kv[1]["sequela"]))
     print(markdown_table(reports))
