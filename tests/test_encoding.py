@@ -42,5 +42,11 @@ class NonUtf8DefaultEncoding(unittest.TestCase):
         self.assertIn("held-out pairs", r.stdout)
 
 
+    def test_the_readme_check_runs_on_a_console_that_cannot_show_its_check_marks(self):
+        r = subprocess.run([sys.executable, "scripts/check_readme_numbers.py"], cwd=ROOT,
+                           env={**HOSTILE, "PYTHONIOENCODING": "ascii"}, capture_output=True)
+        self.assertEqual(r.returncode, 0, r.stderr.decode("utf-8", "replace")[-300:])
+
+
 if __name__ == "__main__":
     unittest.main()

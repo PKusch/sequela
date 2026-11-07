@@ -125,6 +125,10 @@ def check_live_table(text: str, main_tasks: list[dict]) -> int:
 
 
 def main() -> int:
+    # It prints check marks; a console that cannot show them must not turn a
+    # passing check into a crash.
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(errors="replace")
     text = README.read_text(encoding="utf-8")
     main_tasks = load(DATA)
     heldout_tasks = load(HELDOUT)
