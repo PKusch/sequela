@@ -134,6 +134,16 @@ class ResultFileMistakes(unittest.TestCase):
         self.assertEqual(code, 2)
         self.assertIn("run it from a clone of the repository", err)
 
+    def test_the_readme_check_reads_a_live_result_saved_with_a_byte_order_mark(self):
+        import importlib.util
+        from unittest import mock
+        spec = importlib.util.spec_from_file_location("crn", "scripts/check_readme_numbers.py")
+        crn = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(crn)
+        (self.tmp / "x.json").write_bytes(b"\xef\xbb\xbf" + Path("results/local/ollama_gemma3.json").read_bytes())
+        with mock.patch.object(crn, "LOCAL_RESULTS", self.tmp):
+            self.assertIn("ollama:gemma3", crn.local_results())
+
     def test_a_real_result_still_works(self):
         out = self.tmp / "o.json"
         code, _ = run_cli("run", "reference:oracle", "--limit", "5", "--out", str(out))

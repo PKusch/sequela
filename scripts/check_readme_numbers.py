@@ -85,7 +85,7 @@ def local_results() -> dict[str, dict]:
     """Committed main-set answers from live models, by respondent."""
     found = {}
     for path in sorted(LOCAL_RESULTS.glob("*.json")):
-        rec = json.loads(path.read_text(encoding="utf-8"))
+        rec = json.loads(path.read_text(encoding="utf-8-sig"))  # as run.py reads them
         if rec.get("split", "main") == "main":
             found[rec["respondent"]] = rec
     return found
