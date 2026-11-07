@@ -330,6 +330,12 @@ def main(argv: list[str] | None = None) -> int:
     rp.add_argument("results", nargs="+", help="main and held-out results; held-out ones are matched by respondent")
     rp.set_defaults(fn=cmd_report)
     args = ap.parse_args(argv)
+    if args.cmd != "generate" and not DATA.exists():
+        # The dataset lives in the repository, not in the package, so an
+        # installed copy has none; say so instead of a FileNotFoundError.
+        print(f"sequela: no dataset at {DATA}; run it from a clone of the repository "
+              "(https://github.com/PKusch/sequela)", file=sys.stderr)
+        return 2
     return args.fn(args)
 
 

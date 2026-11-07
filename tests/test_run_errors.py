@@ -127,6 +127,13 @@ class ResultFileMistakes(unittest.TestCase):
         code, err = run_cli("score", str(p))
         self.assertEqual(code, 0, err)
 
+    def test_a_copy_without_the_dataset_says_where_to_run_it(self):
+        from unittest import mock
+        with mock.patch("sequela.run.DATA", self.tmp / "data" / "tasks.jsonl"):
+            code, err = run_cli("check")
+        self.assertEqual(code, 2)
+        self.assertIn("run it from a clone of the repository", err)
+
     def test_a_real_result_still_works(self):
         out = self.tmp / "o.json"
         code, _ = run_cli("run", "reference:oracle", "--limit", "5", "--out", str(out))
