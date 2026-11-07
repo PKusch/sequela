@@ -85,6 +85,13 @@ class ResultFileMistakes(unittest.TestCase):
         self.assertIn("is a directory", code)
         self.assertEqual(calls, [], "no task was answered")
 
+    def test_a_model_kind_with_no_model_name_is_refused(self):
+        for spec in ("ollama:", "openai:", "ollama:  "):
+            code, _ = run_cli("run", spec, "--limit", "1", "--out", str(self.tmp / "x.json"))
+            self.assertIsInstance(code, str, spec)
+            self.assertIn("name a model", code)
+            self.assertFalse((self.tmp / "x.json").exists())
+
     def test_a_real_result_still_works(self):
         out = self.tmp / "o.json"
         code, _ = run_cli("run", "reference:oracle", "--limit", "5", "--out", str(out))

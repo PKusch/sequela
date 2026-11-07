@@ -31,6 +31,10 @@ def resolve(spec: str) -> tuple[str, Respondent]:
         model = arg or "claude-sonnet-5"
         return f"anthropic:{model}", make(model)
     if kind in ("openai", "ollama"):
+        if not arg.strip():
+            # an empty name reached the server, every call failed, and the
+            # failures were scored as the model's own unreadable answers
+            raise SystemExit(f"name a model after '{kind}:', e.g. {kind}:{'gemma3' if kind == 'ollama' else 'gpt-5'}")
         from .openai_backend import make
         import os
         if kind == "ollama":
