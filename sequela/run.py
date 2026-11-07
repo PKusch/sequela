@@ -150,7 +150,8 @@ def _read_result(path: Path) -> dict:
     wrong kind of json is the commonest mistake at the command line, and a
     traceback about a missing key says nothing about what to do."""
     try:
-        rec = json.loads(path.read_text(encoding="utf-8"))
+        # utf-8-sig: a result opened and saved in Notepad or Excel starts with a BOM
+        rec = json.loads(path.read_text(encoding="utf-8-sig"))
     except FileNotFoundError:
         raise SystemExit(f"no such result file: {path}")
     except (OSError, ValueError) as e:

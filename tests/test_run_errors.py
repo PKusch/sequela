@@ -120,6 +120,13 @@ class ResultFileMistakes(unittest.TestCase):
         self.assertEqual(code, 2)
         self.assertIn("needs at least one main result", err)
 
+    def test_a_result_saved_with_a_byte_order_mark_is_read(self):
+        # Notepad and Excel add one when they save; it used to read as "not JSON".
+        p = self.tmp / "bom.json"
+        p.write_bytes(b"\xef\xbb\xbf" + Path("results/local/ollama_gemma3.json").read_bytes())
+        code, err = run_cli("score", str(p))
+        self.assertEqual(code, 0, err)
+
     def test_a_real_result_still_works(self):
         out = self.tmp / "o.json"
         code, _ = run_cli("run", "reference:oracle", "--limit", "5", "--out", str(out))
