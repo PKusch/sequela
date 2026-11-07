@@ -301,6 +301,11 @@ def cmd_report(args: argparse.Namespace) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
+    # The tables use an en dash (0.64–0.72) and the held-out lines can quote
+    # Cyrillic; a console that cannot show them must not turn a finished run
+    # into a traceback after its result file is written.
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(errors="replace")
     ap = argparse.ArgumentParser(prog="sequela", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("generate").set_defaults(fn=cmd_generate)

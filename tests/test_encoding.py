@@ -34,8 +34,12 @@ class NonUtf8DefaultEncoding(unittest.TestCase):
         r = run("run", "reference:memorised", "--heldout", "--out", str(out))
         self.assertEqual(r.returncode, 0, r.stderr[-300:])
         out.read_bytes().decode("utf-8")        # raises if what was written is not UTF-8
-        r = run("report", str(out))
+        main = out.with_name("main.json")
+        r = run("run", "reference:memorised", "--out", str(main))
         self.assertEqual(r.returncode, 0, r.stderr[-300:])
+        r = run("report", str(main), str(out))  # held-out results are read beside their main run
+        self.assertEqual(r.returncode, 0, r.stderr[-300:])
+        self.assertIn("held-out pairs", r.stdout)
 
 
 if __name__ == "__main__":
