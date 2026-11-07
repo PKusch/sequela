@@ -83,6 +83,12 @@ def _check_output(out: Path) -> None:
         raise SystemExit(f"cannot write to {out}: permission denied")
 
 
+def _transport_failure(raw) -> bool:
+    """The backends record a failed call as 'HTTP <code>: ...' or 'error: ...'
+    instead of the model's text."""
+    return isinstance(raw, str) and (raw.startswith("HTTP ") or raw.startswith("error: "))
+
+
 def cmd_run(args: argparse.Namespace) -> int:
     name, respond = resolve(args.respondent)
     source = HELDOUT if args.heldout else DATA
@@ -97,9 +103,14 @@ def cmd_run(args: argparse.Namespace) -> int:
     for i, t in enumerate(tasks, 1):
         t0 = time.time()
         parsed = respond(t)
+        raw = getattr(respond, "last_raw", None)
+        if i == 1 and parsed is None and _transport_failure(raw):
+            # Nothing reached the model (no server, wrong name, bad key). Scoring
+            # on would count every failed call as the model's unreadable answer.
+            raise SystemExit(f"the first call to {name} failed, so nothing was run or written: {raw}")
         responses[t["id"]] = {
             "parsed": parsed,
-            "raw": getattr(respond, "last_raw", None),
+            "raw": raw,
             "ms": int(1000 * (time.time() - t0)),
         }
         if args.verbose or i % 25 == 0 or i == len(tasks):

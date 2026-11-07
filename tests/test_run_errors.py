@@ -92,6 +92,29 @@ class ResultFileMistakes(unittest.TestCase):
             self.assertIn("name a model", code)
             self.assertFalse((self.tmp / "x.json").exists())
 
+    def test_a_run_whose_first_call_cannot_reach_the_model_stops_and_writes_nothing(self):
+        from unittest import mock
+        def unreachable(task):
+            unreachable.last_raw = "error: <urlopen error [Errno 61] Connection refused>"
+            return None
+        out = self.tmp / "x.json"
+        with mock.patch("sequela.run.resolve", return_value=("ollama:gemma3", unreachable)):
+            code, _ = run_cli("run", "ollama:gemma3", "--limit", "3", "--out", str(out))
+        self.assertIsInstance(code, str)
+        self.assertIn("the first call to ollama:gemma3 failed", code)
+        self.assertFalse(out.exists())
+
+    def test_an_unreadable_answer_from_a_reachable_model_still_counts_against_it(self):
+        from unittest import mock
+        def rambling(task):
+            rambling.last_raw = "I would rather not say."
+            return None
+        out = self.tmp / "x.json"
+        with mock.patch("sequela.run.resolve", return_value=("ollama:gemma3", rambling)):
+            code, _ = run_cli("run", "ollama:gemma3", "--limit", "2", "--out", str(out))
+        self.assertEqual(code, 0)
+        self.assertTrue(out.exists())
+
     def test_a_real_result_still_works(self):
         out = self.tmp / "o.json"
         code, _ = run_cli("run", "reference:oracle", "--limit", "5", "--out", str(out))
