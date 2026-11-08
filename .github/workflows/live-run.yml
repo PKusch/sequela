@@ -71,6 +71,9 @@ jobs:
           echo "HELDOUT=results/live/${name}.heldout.json" >> "$GITHUB_ENV"
 
       - name: Score, with the reference policies for scale
+        # shell: bash turns on pipefail, so a failure inside the block is not
+        # hidden behind tee's exit code of 0.
+        shell: bash
         run: |
           for p in oracle uncoupled trusting name_reader schema_blind paranoid memorised; do
             python -m sequela.run run reference:$p --out /tmp/ref_$p.json >/dev/null
