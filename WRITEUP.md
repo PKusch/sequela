@@ -106,8 +106,11 @@ scorer calibration.
 
 ## Results, insights, and conclusions
 
-**No frontier model has been run yet.** The build environment had no API access
-and no local model. What exists is the instrument and its calibration.
+**Two small models have been run; no frontier model has.** gemma3 4B and 12B
+ran on a laptop (answers in `results/local/`). Neither beats the two partial readers below: 0.68 (0.64–0.72)
+and 0.72 (0.68–0.75), inside the range of the uncoupled and trusting policies.
+The larger understated more (57% of calls, against 43%) and would proceed
+unasked on 107 calls where 37 is right.
 
 Six deterministic reference policies, each with one deliberate flaw, were run
 to show that each metric moves only when its flaw is present:
@@ -137,7 +140,8 @@ the held-out set it is talked down on 93% of pairs, against 0% on the main
 set. Without the held-out split I could not have seen it.
 
 The question the benchmark exists to answer is whether frontier models
-separate along these axes, and by how much. It is unanswered. The expectation,
+separate along these axes, and by how much. It is unanswered for frontier
+models. The expectation,
 from airlock's experience wrapping a narrator around real MCP tools, is that
 monitoring failures concentrate on boundary escapes and host look-alikes, and
 that suggestibility is non-zero on every model; the reference table shows the
